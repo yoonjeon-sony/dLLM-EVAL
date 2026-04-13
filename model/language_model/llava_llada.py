@@ -1038,92 +1038,22 @@ class LlavaLladaForMaskedDiffusion(LLaDAModelLM,LlavaMetaForCausalLM):
             assert inputs_embeds is not None
             prompt = torch.full((bsz, seq_len), 0, dtype=torch.long).to(model.device)
 
-        # In prefix-LM mode, batched left-padding can shift effective rope/cache positions
-        # for shorter samples. If prefix lengths differ in a batch, decode each sample with
-        # its own trimmed prefix to preserve per-sample positional alignment.
-        if (
-            prefix_lm
-            and inputs_embeds is not None
-            and attention_mask is not None
-            and bsz > 1
-        ):
-            prompt_lens = attention_mask.sum(dim=1)
-            has_padding = (attention_mask == 0).any().item()
-            mixed_prompt_lens = (prompt_lens != prompt_lens[0]).any().item()
-            if has_padding and mixed_prompt_lens:
-                if DEBUG_PRINT_PREFIX_FALLBACK:
-                    prompt_lens_list = [int(x) for x in prompt_lens.detach().cpu().tolist()]
-                    print(
-                        "[DEBUG_PREFIX_FALLBACK] activated "
-                        f"batch_size={bsz} seq_len={seq_len} "
-                        f"prompt_lens={prompt_lens_list} "
-                        f"max_prompt_len={max(prompt_lens_list)} min_prompt_len={min(prompt_lens_list)} "
-                        f"steps={steps} gen_length={gen_length} block_length={block_length}"
-                    )
-                per_sample_outputs = []
-                for b_idx in range(bsz):
-                    cur_len = int(prompt_lens[b_idx].item())
-                    if cur_len <= 0:
-                        raise ValueError(f"Invalid prompt length for sample {b_idx}: {cur_len}")
-                    cur_mask = attention_mask[b_idx].to(dtype=torch.bool)
-                    cur_inputs_embeds = inputs_embeds[b_idx : b_idx + 1, cur_mask, :]
-                    # Fallback should preserve the exact number of valid prefix tokens.
-                    if cur_inputs_embeds.shape[1] != cur_len:
-                        raise ValueError(
-                            f"Trimmed prefix length mismatch for sample {b_idx}: "
-                            f"expected={cur_len} got={cur_inputs_embeds.shape[1]}"
-                        )
-
-                    if DEBUG_PRINT_PREFIX_FALLBACK:
-                        first_valid = int(torch.argmax(cur_mask.to(torch.int32)).item())
-                        last_valid = int((seq_len - 1) - torch.argmax(torch.flip(cur_mask, dims=[0]).to(torch.int32)).item())
-                        print(
-                            "[DEBUG_PREFIX_FALLBACK] sample "
-                            f"idx={b_idx} prompt_len={cur_len} "
-                            f"first_valid={first_valid} last_valid={last_valid}"
-                        )
-
-                    cur_attention_mask = torch.ones(
-                        (1, cur_len),
-                        dtype=attention_mask.dtype,
-                        device=attention_mask.device,
-                    )
-                    cur_prompt = None if prompt is None else prompt[b_idx : b_idx + 1]
-                    cur_draft_tokens = None if draft_tokens is None else draft_tokens[b_idx : b_idx + 1]
-                    cur_prompt_index = None if prompt_index is None else prompt_index[b_idx : b_idx + 1]
-                    cur_input_modality_indices = (
-                        None
-                        if input_modality_indices is None
-                        else input_modality_indices[b_idx : b_idx + 1, cur_mask]
-                    )
-                    cur_bbox_mask = None if bbox_mask is None else bbox_mask[b_idx : b_idx + 1, cur_mask]
-                    cur_mask_pos = None if mask_pos is None else mask_pos[b_idx : b_idx + 1]
-
-                    cur_out = self.generate_text(
-                        prompt=cur_prompt,
-                        steps=steps,
-                        gen_length=gen_length,
-                        block_length=block_length,
-                        temperature=temperature,
-                        cfg_scale=cfg_scale,
-                        remasking=remasking,
-                        mask_id=mask_id,
-                        inputs_embeds=cur_inputs_embeds,
-                        position_ids=position_ids,
-                        attention_mask=cur_attention_mask,
-                        tokenizer=tokenizer,
-                        t2i_inference=t2i_inference,
-                        do_sample=do_sample,
-                        prefix_lm=prefix_lm,
-                        verbose=verbose,
-                        draft_tokens=cur_draft_tokens,
-                        prompt_index=cur_prompt_index,
-                        input_modality_indices=cur_input_modality_indices,
-                        bbox_mask=cur_bbox_mask,
-                        mask_pos=cur_mask_pos,
-                    )
-                    per_sample_outputs.append(cur_out)
-                return torch.cat(per_sample_outputs, dim=0)
+        # Batched prefix-LM precondition: when bsz > 1, the caller must supply a
+        # left-padded inputs_embeds plus a matching attention_mask. The model's
+        # additive attention bias zeroes out padded positions, and RoPE relative
+        # positions are preserved across samples — so a single batched prefix
+        # encode + cached decode is correct without per-sample slicing.
+        if prefix_lm and bsz > 1:
+            if attention_mask is None:
+                raise ValueError(
+                    "generate_text(prefix_lm=True, bsz>1) requires attention_mask. "
+                    "Pre-pad inputs_embeds (left-padding) and pass the matching mask."
+                )
+            if attention_mask.shape != (bsz, seq_len):
+                raise ValueError(
+                    f"attention_mask shape {tuple(attention_mask.shape)} does not "
+                    f"match inputs_embeds prefix shape {(bsz, seq_len)}."
+                )
 
         if steps == 1:
             if bbox_mask is None and mask_pos is not None:

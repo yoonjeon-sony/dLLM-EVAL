@@ -46,10 +46,18 @@ eval_logger = logging.getLogger("lmms-eval")
 
 # Enable TF32 for CUDA
 torch.backends.cuda.matmul.allow_tf32 = True
-DEBUG_PRINT_OUTPUT = os.environ.get('DEBUG_PRINT_OUTPUT',False)
 
-# Import LLaVA modules
-DEBUG_LOAD_TRAINER = os.environ.get('DEBUG_LOAD_TRAINER',False)
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+DEBUG_PRINT_OUTPUT = _env_flag("DEBUG_PRINT_OUTPUT")
+LOG_BATCH_TIMING = _env_flag("LOG_BATCH_TIMING", default=True)
+
 from constants import (
     DEFAULT_IM_END_TOKEN,
     DEFAULT_IM_START_TOKEN,
@@ -341,20 +349,19 @@ class Llava_Llada(lmms):
         pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
 
         origin_image_aspect_ratio = getattr(self._config, "image_aspect_ratio", None)
-        if DEBUG_LOAD_TRAINER:
-            ckpt1 = torch.load(DEBUG_LOAD_TRAINER, map_location='cpu')
-            ckpt1 = {k.replace('module.model','model'):v for k,v in ckpt1.items()}
-            _res = self.model.load_state_dict(ckpt1,strict=False)
-            print(f"DEBUG_LOAD_TRAINER:{DEBUG_LOAD_TRAINER} {_res}")
-            print("Something is broken if above line does not show all keys matched!!!")
-            del ckpt1
         delta_t = 0
         num_generated = 0
+        expected_bs = self.batch_size_per_gpu
         # Set up generation kwargs
         for chunk in chunks:
             batched_contexts, all_gen_kwargs, batched_doc_to_visual, batched_doc_id, batched_task, batched_split = zip(*chunk)
             gen_kwargs = all_gen_kwargs[0]
             batch_size = len(batched_contexts)
+            if LOG_BATCH_TIMING:
+                eval_logger.info(
+                    f"[batch_check] rank={self.rank} chunk_bs={batch_size} "
+                    f"expected_bs={expected_bs} (mismatch={batch_size != expected_bs})"
+                )
             batch_pil_images = [
                 doc_to_visual(self.task_dict[task_name][split_name][doc_id]) # List[PIL.Image.Image]
                 for doc_to_visual, task_name, split_name, doc_id in zip(
@@ -460,10 +467,13 @@ class Llava_Llada(lmms):
                 return (x0, y0, x1, y1)
 
             
+            t_prompt0 = time.time()
             prompt_texts = [_build_text_prompt(ctx, len(images)) for ctx, images in zip(batched_contexts, batch_pil_images)]
             grounding_prompts = [_build_grounding_prompt(ctx, 1) for ctx, images in zip(batched_contexts, batch_pil_images)]
             edit_prompts = [_build_edit_prompt(ctx) for ctx in batched_contexts]
+            t_prompt1 = time.time()
 
+            t_proc0 = time.time()
             batch_inputs = self.processing_class(
                 texts=prompt_texts,
                 grounding_texts=grounding_prompts,
@@ -479,7 +489,8 @@ class Llava_Llada(lmms):
                 mode=self.chat_mode,
                 do_cfg=False,
             )
-            
+            t_proc1 = time.time()
+
             # Forward img_gen_* params as kwargs so _generate_image picks them up
             image_gen_kwargs = {
                 "guidance_scale": 0,
@@ -507,6 +518,7 @@ class Llava_Llada(lmms):
             #     init_images.append(padded)
 
             num_blocks = gen_kwargs["max_new_tokens"] // gen_kwargs["block_length"]
+            t_gen0 = time.time()
             gen_result = self.inferencer._generate_mode(
                 gen_type=self.chat_mode,
                 tokenizer=self.processing_class.tokenizer,
@@ -526,6 +538,9 @@ class Llava_Llada(lmms):
                 input_images=batch_pil_images,
                 **batch_inputs,
             )
+            if torch.cuda.is_available():
+                torch.cuda.synchronize(device=self._device)
+            t_gen1 = time.time()
             completion_ids = gen_result["completion_ids"]
             text_outputs = [
                 txt.lstrip("!").strip()
@@ -536,7 +551,17 @@ class Llava_Llada(lmms):
             t1 = time.time()
             delta_t += t1 - t0
             num_generated += batch_size
+            chunk_total = t1 - t0
             print(f"Avg Latency (of {num_generated}): {delta_t/num_generated}")
+            if LOG_BATCH_TIMING:
+                eval_logger.info(
+                    f"[stage_timing] rank={self.rank} bs={batch_size} "
+                    f"prompt_build={t_prompt1 - t_prompt0:.3f}s "
+                    f"processing={t_proc1 - t_proc0:.3f}s "
+                    f"generate_mode={t_gen1 - t_gen0:.3f}s "
+                    f"chunk_total={chunk_total:.3f}s "
+                    f"per_sample={chunk_total / max(batch_size, 1):.3f}s"
+                )
 
             # --- Save generated images and update doc metadata ---
             img_save_paths = [None] * batch_size

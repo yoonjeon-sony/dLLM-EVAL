@@ -9,7 +9,7 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path(
     # "/home/yoonjeon.kim/dLLM-RL/train_sft/outputs/image_gen_usebboxTrue_tok512_blk256_step256_t0"
-    "/home/yoonjeon.kim/dLLM-RL/train_sft/outputs/image_gen_usebboxFalse_tok512_blk256_step256_t0"
+    "./outputs/image_gen_usebboxFalse_tok512_blk256_step256_t0"
     # "/home/yoonjeon.kim/dLLM-RL/train_sft/testing/image_gen_usebboxFalse_tok512_blk256_step256_t0"
 )
 
