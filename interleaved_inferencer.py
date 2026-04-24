@@ -132,6 +132,8 @@ class InterleavedInferencer:
         remasking: str = "low_confidence",
         mask_id: int = 126336,
         generation_batch_size: Optional[int] = None,
+        image_batch_size: Optional[int] = None,
+        text_batch_size: Optional[int] = None,
         image_gen_kwargs: Optional[dict] = None,
         return_debug: bool = False,
         processing_class=None,
@@ -148,6 +150,10 @@ class InterleavedInferencer:
 
         if generation_batch_size is None:
             generation_batch_size = input_embeds.size(0)
+        if image_batch_size is None:
+            image_batch_size = generation_batch_size
+        if text_batch_size is None:
+            text_batch_size = generation_batch_size
 
         if device is None:
             device = input_embeds.device
@@ -169,8 +175,8 @@ class InterleavedInferencer:
                 )
 
             with _stage_timer("bbox_rollout"):
-                for i in range(0, len(ground_row_indices), generation_batch_size):
-                    end_idx = min(i + generation_batch_size, len(ground_row_indices))
+                for i in range(0, len(ground_row_indices), image_batch_size):
+                    end_idx = min(i + image_batch_size, len(ground_row_indices))
                     batch_input_embeds_grounding = input_embeds_grounding[i:end_idx]
                     batch_bbox_mask = bbox_mask_grounding[i:end_idx]
                     batch_bbox_ids, pred_bboxes, bbox_texts = self.model.generate_bbox(
@@ -184,20 +190,12 @@ class InterleavedInferencer:
                     for source_row_idx, pred_bbox in zip(ground_row_indices[i:end_idx], pred_bboxes):
                         pred_bboxes_full[source_row_idx] = pred_bbox
 
-        for i in range(0, total, generation_batch_size):
-            end_idx = min(i + generation_batch_size, total)
-            if gen_type == "text_gen":
-                batch_input_embeds = input_embeds[i:end_idx]
-                batch_attention_mask = attention_mask[i:end_idx]
-            elif gen_type == "image_gen":
-                if use_bbox:
-                    batch_pred_bboxes = pred_bboxes_full[i:end_idx]
-                else:
-                    batch_pred_bboxes = None
+        # Phase 1 (image_gen only): image rollout at image_batch_size.
+        if gen_type == "image_gen":
+            for i in range(0, total, image_batch_size):
+                end_idx = min(i + image_batch_size, total)
+                batch_pred_bboxes = pred_bboxes_full[i:end_idx] if use_bbox else None
 
-                #! Image Editing Generation
-                batch_images = input_images[i:end_idx]
-                # batch_image_sizes = image_sizes[i:end_idx] if image_sizes is not None else None
                 batch_input_embeds_gen = input_embeds_gen[i:end_idx]
                 batch_attention_mask_gen = attention_mask_gen[i:end_idx]
                 batch_is_gen = is_gen[i:end_idx]
@@ -205,7 +203,7 @@ class InterleavedInferencer:
                 batch_is_prompt = is_prompt[i:end_idx]
                 batch_init_latents = init_latents[i:end_idx]
                 batch_input_ids_gen = input_ids_gen[i:end_idx]
-                #! Image Generation
+
                 with _stage_timer("image_rollout"):
                     batch_edited_images, batch_image_completion_ids, batch_edit_region_mask = self.model.generate_image(
                         init_latents=batch_init_latents,
@@ -222,10 +220,18 @@ class InterleavedInferencer:
                 image_masks_all.append(batch_edit_region_mask)
                 edited_images_all.extend(batch_edited_images)
 
-                #! Text Generation
+        # Phase 2: text rollout at text_batch_size (for both gen_types).
+        for i in range(0, total, text_batch_size):
+            end_idx = min(i + text_batch_size, total)
+            if gen_type == "text_gen":
+                batch_input_embeds = input_embeds[i:end_idx]
+                batch_attention_mask = attention_mask[i:end_idx]
+            else:  # image_gen: rebuild text inputs using the edited images from Phase 1
+                batch_images = input_images[i:end_idx]
+                batch_edited_images = edited_images_all[i:end_idx]
                 batch_answer_prompts = answer_prompts[i:end_idx]
                 batch_all_images = [orig + [edited] for orig, edited in zip(batch_images, batch_edited_images)]
-                
+
                 re_batch_inputs = processing_class(
                     texts=batch_answer_prompts,
                     images=batch_all_images,
@@ -259,7 +265,7 @@ class InterleavedInferencer:
                     do_sample=False,
                     prefix_lm=True,
                 )
-            
+
             prompt_completion_ids_all.append(batch_prompt_completion_ids)
         
         completion_ids = torch.cat(prompt_completion_ids_all, dim=0)

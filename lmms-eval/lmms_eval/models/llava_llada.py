@@ -520,6 +520,11 @@ class Llava_Llada(lmms):
             #     init_images.append(padded)
 
             num_blocks = gen_kwargs["max_new_tokens"] // gen_kwargs["block_length"]
+            # In image_gen, image and text rollouts run as separate phases so they can
+            # be batched differently: image uses the outer chunk (batch_size), text
+            # scales inversely with max_new_tokens.
+            text_batch_size = max(1, (2 ** 15) // gen_kwargs["max_new_tokens"])
+            image_batch_size = batch_size
             t_gen0 = time.time()
             gen_result = self.inferencer._generate_mode(
                 gen_type=self.chat_mode,
@@ -532,6 +537,8 @@ class Llava_Llada(lmms):
                 remasking="low_confidence",
                 mask_id=mask_id,
                 generation_batch_size=batch_size,
+                image_batch_size=image_batch_size,
+                text_batch_size=text_batch_size,
                 image_gen_kwargs=image_gen_kwargs,
                 processing_class=self.processing_class,
                 device=device,
