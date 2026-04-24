@@ -184,6 +184,46 @@ def simple_evaluate(
 
     task_dict = get_task_dict(tasks, task_manager)
 
+    # Auto-tune batch size when the caller did not specify one.
+    #   - image_gen mode: fixed at 32 (image-gen cost is not driven by text max_new_tokens)
+    #   - text_gen mode: scale inversely from tasks' default max_new_tokens (512 @ 16)
+    if batch_size is None:
+        parsed_model_args = simple_parse_args_string(model_args) if isinstance(model_args, str) else (model_args or {})
+        chat_mode = parsed_model_args.get("chat_mode") if isinstance(parsed_model_args, dict) else None
+
+        if chat_mode == "image_gen":
+            batch_size = 32
+            eval_logger.info(f"Auto batch_size = {batch_size} (chat_mode=image_gen, fixed)")
+        else:
+            def _collect_max_new_tokens(td):
+                values = []
+                for _name, obj in td.items():
+                    if isinstance(obj, dict):
+                        values.extend(_collect_max_new_tokens(obj))
+                        continue
+                    if isinstance(obj, tuple):
+                        _, obj = obj
+                        if obj is None:
+                            continue
+                    task_gen = getattr(obj, "config", None)
+                    task_gen = getattr(task_gen, "generation_kwargs", None) if task_gen is not None else None
+                    mnt = None
+                    if gen_kwargs and isinstance(gen_kwargs, dict):
+                        mnt = gen_kwargs.get("max_new_tokens")
+                    if mnt is None and task_gen:
+                        mnt = task_gen.get("max_new_tokens")
+                    if mnt is not None:
+                        try:
+                            values.append(int(mnt))
+                        except (TypeError, ValueError):
+                            pass
+                return values
+
+            mnt_values = _collect_max_new_tokens(task_dict)
+            max_mnt = max(mnt_values) if mnt_values else 16
+            batch_size = max(1, 512 * 16 // max_mnt)
+            eval_logger.info(f"Auto batch_size = {batch_size} (max task max_new_tokens = {max_mnt})")
+
     if isinstance(model, str):
         if model_args is None:
             model_args = ""

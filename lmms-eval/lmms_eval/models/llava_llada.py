@@ -388,9 +388,12 @@ class Llava_Llada(lmms):
             if schedule_kwargs:
                 gen_kwargs['schedule_kwargs'] = schedule_kwargs
             if 'block_length' not in gen_kwargs:
-                gen_kwargs['block_length'] = min(128, gen_kwargs["max_new_tokens"])
+                if gen_kwargs["max_new_tokens"] < 128:
+                    gen_kwargs['block_length'] = gen_kwargs["max_new_tokens"]
+                else:
+                    gen_kwargs['block_length'] = gen_kwargs["max_new_tokens"] // 2
             if 'step_per_block' not in gen_kwargs and 'step_ratio' not in gen_kwargs:
-                gen_kwargs['step_per_block'] = gen_kwargs['block_length']
+                gen_kwargs['step_per_block'] = max(1, gen_kwargs['block_length'] // 2)
 
             text_gen_kwargs = {
                 "max_new_tokens": gen_kwargs.get("max_new_tokens", 256),
@@ -409,12 +412,11 @@ class Llava_Llada(lmms):
                 return conv_templates[self.conv_template].copy()
 
             def _build_text_prompt(ctx, num_images):
-                from data_utils import COT_PROMPT
                 if num_images > 0 and DEFAULT_IMAGE_TOKEN not in ctx:
                     image_tokens = " ".join([DEFAULT_IMAGE_TOKEN] * num_images)
-                    prompts_input = image_tokens + f"\n {COT_PROMPT} {ctx}"
+                    prompts_input = image_tokens + f"\n {ctx}"
                 else:
-                    prompts_input = f"{COT_PROMPT} {ctx}"
+                    prompts_input = f"{ctx}"
                 conv = _copy_conv()
                 conv.append_message(conv.roles[0], prompts_input)
                 conv.append_message(conv.roles[1], None)

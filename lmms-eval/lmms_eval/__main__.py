@@ -115,9 +115,9 @@ def parse_eval_args() -> argparse.Namespace:
         "--batch_size",
         "-b",
         type=str,
-        default=1,
+        default=None,
         metavar="auto|auto:N|N",
-        help="Acceptable values are 'auto', 'auto:N' or N, where N is an integer. Default 1.",
+        help="Acceptable values are 'auto', 'auto:N' or N. If omitted, batch size is auto-tuned from the task's max_new_tokens (512 @ 16, scaled inversely).",
     )
     parser.add_argument(
         "--max_batch_size",

@@ -10,17 +10,27 @@
 #SBATCH --output=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/output.%j.log
 #SBATCH --error=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/error.%j.log
 
-# USE_BBOX=False CHAT_MODE="image_gen" TASKS="blink_jigsaw,vstar_bench,cv_bench,chartqa,mmvet,VisPuzzle_direct" BATCH_SIZE=16 sbatch scripts/run_lmms-eval.sh
+# USE_BBOX=False CHAT_MODE="image_gen" TASKS="blink_jigsaw,vstar_bench,cv_bench,chartqa,mmvet,VisPuzzle_direct" sbatch scripts/run_lmms-eval.sh 0
 CHAT_MODE=${CHAT_MODE:-image_gen} # text_gen,image_gen
 USE_BBOX=${USE_BBOX:-False}
-BATCH_SIZE=${BATCH_SIZE:-16}
-
-# CKPT="/group2/dgm/yoonjeon/LaViDa-O"
-# CKPT="/group2/dgm/yoonjeon/ckpts/sft-lavidao-thinkmorph-complete/checkpoint-2420" # SFT model 1
-CKPT="/group2/dgm/yoonjeon/ckpts/sft_LaViDa-O-thinkmorph_zebracot/checkpoint-9000" # SFT model 2
-# CKPT="yjyjyj98/thinkmorph-interleaved_reasoning-multimodal_reward-beta0.04_attnFixed-SFT_NEW-yes_bbox_ckpt100"
-# CKPT="yjyjyj98/thinkmorph-interleaved_reasoning-multimodal_reward-beta0.04_attnFixed-SFT_NEW-yes_bbox_ckpt200"
-# CKPT=/group2/dgm/yoonjeon/ckpts/rl-lavidao-thinkmorph/thinkmorph-interleaved_reasoning-multimodal_reward-beta0_attnFixed-yes_bbox/checkpoint-50
+CKPT_INDEX=$1
+shift
+declare -a CKPTS=(
+  "/scratch2/yoonjeon.kim/LaViDa-O" # mmmu_val,vstar_bench,blink,chartqa done => add scienceqa_img,cv_bench,VisualPuzzles_cot,mmstar
+  "/scratch2/yoonjeon.kim/sft_LaViDa-O-thinkmorph_zebracot-step9000" # mmmu_val,vstar_bench,blink,chartqa done => add scienceqa_img,cv_bench,VisualPuzzles_cot,mmstar
+  "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-LavidaO/checkpoint-50" # add mmmu_val(900),vstar_bench(191),blink(1,901),chartqa(2,500),scienceqa_img(2,017),cv_bench(2,638),VisualPuzzles_cot(1,168),mmstar(1,500)
+  "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50"
+  "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-region-edit-LavidaO/checkpoint-50"
+)
+if [[ -z "${CKPT_INDEX}" ]]; then
+    echo "Error: CKPT_INDEX (first positional argument) is required. Valid range: 0-$((${#CKPTS[@]} - 1))" >&2
+    exit 1
+fi
+if ! [[ "${CKPT_INDEX}" =~ ^[0-9]+$ ]] || (( CKPT_INDEX >= ${#CKPTS[@]} )); then
+    echo "Error: CKPT_INDEX='${CKPT_INDEX}' is out of range. Valid range: 0-$((${#CKPTS[@]} - 1))" >&2
+    exit 1
+fi
+CKPT="${CKPTS[${CKPT_INDEX}]}"
 LIMIT=${LIMIT:-}
 NUM_GPUS=${NUM_GPUS:-2}
 TASKS=${TASKS:-} 
@@ -28,10 +38,7 @@ TASKS=${TASKS:-}
 # mathvista_testmini_cot,mathverse_testmini,dynamath_reasoning"
 # thinkmorph_visual_search,thinkmorph_spatial_navigation,thinkmorph_jigsaw_assembly,thinkmorph_chart_refocus
 
-MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-512}
-BLOCK_LENGTH=${BLOCK_LENGTH:-256}
-STEP_PER_BLOCK=${STEP_PER_BLOCK:-${BLOCK_LENGTH}}
-TEMPERATURE=${TEMPERATURE:-0}
+
 SAVE_PARITY_CASES=${SAVE_PARITY_CASES:-0}
 PARITY_CASES_ROOT=${PARITY_CASES_ROOT:-DEBUG/parity_text_gen}
 PARITY_CASES_MAX_PER_TASK=${PARITY_CASES_MAX_PER_TASK:-4}
@@ -41,9 +48,9 @@ export DEBUG_PRINT_IMAGE_RES=1
 export DEBUG_FIX_PADDING=1
 
 MODEL_NAME=$(basename "$(dirname "$CKPT")")-$(basename "$CKPT")
-BASE_DIR="outputs/eval_generate_logs/"
+BASE_DIR="outputs"
 
-OUTPUT_DIR="${BASE_DIR}/${CHAT_MODE}_usebbox${USE_BBOX}_tok${MAX_NEW_TOKENS}_blk${BLOCK_LENGTH}_step${STEP_PER_BLOCK}_t${TEMPERATURE}/${MODEL_NAME}"
+OUTPUT_DIR="${BASE_DIR}/${CHAT_MODE}_usebbox${USE_BBOX}_default/${MODEL_NAME}"
 
 if [ "${NUM_GPUS}" -eq 1 ]; then
     LAUNCH_CMD="python"
@@ -58,7 +65,7 @@ else
     LAUNCH_ARGS="-m lmms_eval"
 fi
 
-echo "Running with TASKS=${TASKS} CKPT=${CKPT} BATCH_SIZE=${BATCH_SIZE} CHAT_MODE=${CHAT_MODE}"
+echo "Running with TASKS=${TASKS} CKPT=${CKPT} CHAT_MODE=${CHAT_MODE} (batch_size auto-tuned from task max_new_tokens)"
 
 LIMIT_ARGS=()
 if [[ -n "${LIMIT}" && "${LIMIT,,}" != "none" ]]; then
@@ -73,12 +80,16 @@ ${LAUNCH_CMD} ${LAUNCH_ARGS} \
     --model llava_llada \
     --model_args pretrained=$CKPT,conv_template=llada,model_name=llava_llada${CHAT_MODE:+,chat_mode=${CHAT_MODE},use_bbox=${USE_BBOX}},gen_img_dir=${OUTPUT_DIR}/gen_imgs\
     --tasks "$TASKS" \
-    --batch_size ${BATCH_SIZE} \
-    --gen_kwargs prefix_lm=True,max_new_tokens=${MAX_NEW_TOKENS},block_length=${BLOCK_LENGTH},step_per_block=${STEP_PER_BLOCK},temperature=${TEMPERATURE} \
+    --gen_kwargs prefix_lm=True \
     --log_samples \
     --log_samples_suffix llava_llada \
-    --output_path ${OUTPUT_DIR} --verbosity=DEBUG \
+    --output_path ${OUTPUT_DIR} \
     --wandb_args "project=lmms-eval,job_type=eval,name=${EVAL_RUN:-debug}" \
     "${LIMIT_ARGS[@]}" \
     "${PARITY_ARGS[@]}" \
     "$@"
+
+    # ,max_new_tokens=${MAX_NEW_TOKENS},block_length=${BLOCK_LENGTH},step_per_block=${STEP_PER_BLOCK},temperature=${TEMPERATURE}
+
+echo "Done evaluating checkpoint: ${CKPT}"
+echo "Results saved to: ${OUTPUT_DIR}"
