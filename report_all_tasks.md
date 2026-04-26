@@ -9,15 +9,15 @@ Schema note: ROOT2/ROOT3 records store `resps[0][0]` as a plain string, while RO
 
 ## Queue progress (live)
 
-Updated 2026-04-26T15:49:46Z. **18 / 40** done · 8 running · 14 pending · 0 errored. Aggregate running ETA ≈ **5m12s**.
+Updated 2026-04-26T17:26:47Z. **14 / 35** done · 8 running · 13 pending · 0 errored. Aggregate running ETA ≈ **77h51m**.
 
-|             | `mmvet` | `mmstar` | `mmmu_val` | `vstar_bench` | `cv_bench_reasoning` | `chartqa` | `blink_jigsaw` | `VisualPuzzles_cot` |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `Unified-cp50` | ✅ 18.81% | ✅ 44.60% | 🏃 56% | ✅ 33.84% | 🏃 100% | ✅ 62.40% | ✅ 47.33% | 🏃 100% |
-| `region-edit-cp50` | ✅ 20.64% | ✅ 44.40% | 🏃 45% | ✅ 29.32% | 🏃 100% | ✅ 63.36% | ✅ 47.33% | 🏃 100% |
-| `answer-LavidaO-ckpt50` | ✅ 17.43% | 🏃 67% | ⏳ | ✅ 36.13% | ⏳ | ⏳ | ✅ 47.33% | ⏳ |
-| `edit-LavidaO-ckpt50` | ✅ 18.35% | ⏳ | ⏳ | ⏳ | ⏳ | ⏳ | 🏃 100% | ⏳ |
-| `interleave-cp50` | ✅ 19.72% | ✅ 41.93% | ⏳ | ⏳ | ⏳ | ✅ 66.16% | ✅ 48.00% | ⏳ |
+|             | `mmvet` | `mmstar` | `mmmu_val` | `vstar_bench` | `cv_bench_reasoning` | `chartqa` | `blink_jigsaw` |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `Unified-cp50` | ✅ 18.81% | ✅ 44.60% | 🏃 7% | ✅ 33.84% | 🏃 11% | ✅ 62.40% | ⏳ |
+| `region-edit-cp50` | ✅ 20.64% | ✅ 44.40% | ⏳ | ✅ 29.32% | 🏃 11% | ✅ 63.36% | ⏳ |
+| `answer-LavidaO-ckpt50` | ✅ 17.43% | 🏃 57% | ⏳ | ✅ 36.13% | 🏃 5% | 🏃 23% | ⏳ |
+| `edit-LavidaO-ckpt50` | ✅ 18.35% | 🏃 26% | 🏃 45% | ⏳ | ⏳ | ⏳ | ⏳ |
+| `interleave-cp50` | ✅ 19.72% | ✅ 41.93% | ⏳ | ⏳ | ⏳ | ✅ 66.16% | ⏳ |
 
 Legend: ✅ done · 🏃 running (% from tqdm) · ⏳ pending · ♻ retrying · ❌ failed
 
@@ -25,14 +25,14 @@ Legend: ✅ done · 🏃 running (% from tqdm) · ⏳ pending · ♻ retrying ·
 
 | ckpt | task | gpu | started | elapsed | tqdm % | remaining (ETA) |
 |---|---|---:|---|---:|---:|---:|
-| `Unified-cp50` | `mmmu_val` | 1 | 2026-04-26T14:48:06Z | 2m14s | 56% | 1m44s |
-| `Unified-cp50` | `cv_bench_reasoning` | 2 | 2026-04-26T14:48:07Z | 3m19s | 100% | 0m00s |
-| `Unified-cp50` | `VisualPuzzles_cot` | 3 | 2026-04-26T14:48:09Z | 4m03s | 100% | 0m00s |
-| `region-edit-cp50` | `mmmu_val` | 4 | 2026-04-26T14:48:10Z | 1m48s | 45% | 2m10s |
-| `region-edit-cp50` | `cv_bench_reasoning` | 5 | 2026-04-26T14:48:12Z | 3m19s | 100% | 0m00s |
-| `region-edit-cp50` | `VisualPuzzles_cot` | 6 | 2026-04-26T14:48:13Z | 4m04s | 100% | 0m00s |
-| `answer-LavidaO-ckpt50` | `mmstar` | 7 | 2026-04-26T14:48:15Z | 2m40s | 67% | 1m18s |
-| `edit-LavidaO-ckpt50` | `blink_jigsaw` | 0 | 2026-04-26T14:37:18Z | 3m26s | 100% | 0m00s |
+| `Unified-cp50` | `mmmu_val` | 1 | 2026-04-26T17:14:52Z | 10m08s | 7% | 2h15m |
+| `Unified-cp50` | `cv_bench_reasoning` | 2 | 2026-04-26T14:48:07Z | 2h33m | 11% | 20h58m |
+| `region-edit-cp50` | `cv_bench_reasoning` | 5 | 2026-04-26T14:48:12Z | 2h34m | 11% | 20h58m |
+| `answer-LavidaO-ckpt50` | `mmstar` | 7 | 2026-04-26T14:48:15Z | 2h36m | 57% | 1h56m |
+| `answer-LavidaO-ckpt50` | `cv_bench_reasoning` | 4 | 2026-04-26T16:07:37Z | 1h07m | 5% | 22h15m |
+| `answer-LavidaO-ckpt50` | `chartqa` | 0 | 2026-04-26T16:03:10Z | 1h22m | 23% | 4h42m |
+| `edit-LavidaO-ckpt50` | `mmstar` | 6 | 2026-04-26T16:14:29Z | 1h10m | 26% | 3h26m |
+| `edit-LavidaO-ckpt50` | `mmmu_val` | 3 | 2026-04-26T16:18:53Z | 1h03m | 45% | 1h17m |
 
 ---
 
@@ -46,7 +46,7 @@ Each cell: `default% → robust% (Δ pp, correct/N)`. `—` = file missing.
 | `chartqa` | 0.00% → **4.55%** (Δ +4.55pp, 117/2569) | 0.28% → **7.16%** (Δ +6.88pp, 179/2500) | 0.00% → **62.40%** (Δ +62.40pp, 1605/2572) | 0.00% → **63.36%** (Δ +63.36pp, 1584/2500) | — | — | 0.00% → **66.16%** (Δ +66.16pp, 1654/2500) |
 | `cv_bench` | 0.00% → **16.09%** (Δ +16.09pp, 425/2642) | — | 0.00% → **64.48%** (Δ +64.48pp, 1701/2638) | 0.00% → **65.20%** (Δ +65.20pp, 1720/2638) | — | — | — |
 | `cv_bench_reasoning` | — | — | — | — | — | — | — |
-| `blink_jigsaw` | 0.00% → **25.32%** (Δ +25.32pp, 39/154) | 0.00% → **25.33%** (Δ +25.33pp, 38/150) | 0.00% → **47.33%** (Δ +47.33pp, 71/150) | 0.00% → **47.33%** (Δ +47.33pp, 71/150) | 0.00% → **47.33%** (Δ +47.33pp, 71/150) | — | 0.00% → **48.00%** (Δ +48.00pp, 72/150) |
+| `blink_jigsaw` | — | — | — | — | — | — | — |
 | `vstar_bench` | — | — | 0.00% → **33.84%** (Δ +33.84pp, 89/263) | 0.00% → **29.32%** (Δ +29.32pp, 56/191) | 0.00% → **36.13%** (Δ +36.13pp, 69/191) | — | — |
 | `VisPuzzle_direct` | 0.00% → **0.00%** (Δ +0.00pp, 0/400) | — | 0.00% → **0.00%** (Δ +0.00pp, 0/400) | 0.00% → **0.00%** (Δ +0.00pp, 0/400) | — | — | — |
 | `mmstar` | — | 2.60% → **3.13%** (Δ +0.53pp, 47/1500) | 33.40% → **44.60%** (Δ +11.20pp, 669/1500) | 31.27% → **44.40%** (Δ +13.13pp, 666/1500) | — | — | 29.60% → **41.93%** (Δ +12.33pp, 629/1500) |
@@ -70,12 +70,6 @@ Each cell: `default% → robust% (Δ pp, correct/N)`. `—` = file missing.
 | `cv_bench` | LaViDa-O (base) | 2642 | 77.37 | 22.60 | 0.04 | empty:2044, trailing_letter:597, raw:1 |
 | `cv_bench` | Unified-cp50 | 2638 | 0.00 | 99.05 | 0.95 | trailing_letter:2613, raw:25 |
 | `cv_bench` | region-edit-cp50 | 2638 | 0.00 | 99.09 | 0.91 | trailing_letter:2614, raw:24 |
-| `blink_jigsaw` | LaViDa-O (base) | 154 | 52.60 | 47.40 | 0.00 | empty:81, trailing_letter:73 |
-| `blink_jigsaw` | sft-zebracot | 150 | 52.67 | 47.33 | 0.00 | empty:79, trailing_letter:71 |
-| `blink_jigsaw` | Unified-cp50 | 150 | 0.00 | 100.00 | 0.00 | trailing_letter:150 |
-| `blink_jigsaw` | region-edit-cp50 | 150 | 0.00 | 100.00 | 0.00 | trailing_letter:150 |
-| `blink_jigsaw` | answer-LavidaO-ckpt50 | 150 | 0.00 | 100.00 | 0.00 | trailing_letter:150 |
-| `blink_jigsaw` | interleave-cp50 | 150 | 0.00 | 100.00 | 0.00 | trailing_letter:150 |
 | `vstar_bench` | Unified-cp50 | 263 | 0.00 | 89.35 | 10.65 | the_answer_is:148, trailing_letter:87, raw:28 |
 | `vstar_bench` | region-edit-cp50 | 191 | 0.00 | 91.10 | 8.90 | trailing_letter:104, the_answer_is:70, raw:17 |
 | `vstar_bench` | answer-LavidaO-ckpt50 | 191 | 0.00 | 97.91 | 2.09 | trailing_letter:127, the_answer_is:60, raw:4 |

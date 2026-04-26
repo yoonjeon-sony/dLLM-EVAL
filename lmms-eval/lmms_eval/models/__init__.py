@@ -80,7 +80,8 @@ AVAILABLE_MODELS = {
     "whisper": "Whisper",
     "whisper_vllm": "WhisperVllm",
     "llava_llada":"Llava_Llada",
-    "llava_dream":"Llava_Dream"
+    "llava_dream":"Llava_Dream",
+    "mmada": "Mmada",
 }
 
 

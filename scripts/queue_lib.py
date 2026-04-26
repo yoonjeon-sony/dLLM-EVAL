@@ -96,11 +96,16 @@ def slack_post(text: str, *, blocks: list | None = None, mute: bool = False) -> 
 
 # ──────────────────────────── tqdm parsing ────────────────────────────
 
-# Matches "[H:MM:SS<H:MM:SS, …]" or "[MM:SS<MM:SS, …]" (tqdm rate suffix optional)
-_TQDM_RE = re.compile(
+# Outer per-task progress bar: "Model Responding: 41%|...| 12/29 [57:33<1:20:05, 282.67s/it]"
+# Inner per-batch bars (e.g. "Region editing 8 images: 26/64 [01:36<02:21]") are
+# image-gen sub-steps and would mislead the ETA, so we ignore them.
+_TQDM_LINE_RE = re.compile(
+    r"Model Responding:\s*(?P<pct>\d+(?:\.\d+)?)\s*%[^\[]*"
     r"\[(?P<elapsed>\d+(?::\d+){1,2})<(?P<remaining>\d+(?::\d+){1,2})"
 )
-_PCT_RE  = re.compile(r"(\d+(?:\.\d+)?)\s*%\|")
+# Fallback for runs that haven't emitted Model Responding yet (e.g. mid-load):
+# we'll fall back to None so the report shows pct=— rather than a misleading
+# image-gen bar value.
 
 
 def _hms_to_seconds(s: str) -> int:
@@ -111,9 +116,10 @@ def _hms_to_seconds(s: str) -> int:
     return h * 3600 + m * 60 + sec
 
 
-def parse_tqdm_tail(log_path: Path, tail_bytes: int = 16 * 1024) -> dict | None:
-    """Read last N bytes of a log and return {elapsed_s, remaining_s, pct} from the
-    most recent `Model Responding` (or any) tqdm bar, or None if no bar yet."""
+def parse_tqdm_tail(log_path: Path, tail_bytes: int = 64 * 1024) -> dict | None:
+    """Return {elapsed_s, remaining_s, pct} from the most recent `Model Responding`
+    bar in the last N bytes of the log. Returns None if no such bar exists yet
+    — image-gen sub-bars are intentionally ignored so they don't pollute the ETA."""
     if not log_path.exists():
         return None
     size = log_path.stat().st_size
@@ -121,22 +127,17 @@ def parse_tqdm_tail(log_path: Path, tail_bytes: int = 16 * 1024) -> dict | None:
         if size > tail_bytes:
             fh.seek(size - tail_bytes)
         chunk = fh.read().decode("utf-8", errors="ignore")
-    # tqdm uses '\r' for in-place updates; split on both
     last_match = None
-    last_pct   = None
     for line in re.split(r"[\r\n]", chunk):
-        m = _TQDM_RE.search(line)
+        m = _TQDM_LINE_RE.search(line)
         if m:
             last_match = m
-            p = _PCT_RE.search(line)
-            if p:
-                last_pct = float(p.group(1))
     if last_match is None:
         return None
     return {
         "elapsed_s":   _hms_to_seconds(last_match.group("elapsed")),
         "remaining_s": _hms_to_seconds(last_match.group("remaining")),
-        "pct":         last_pct,
+        "pct":         float(last_match.group("pct")),
     }
 
 
