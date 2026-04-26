@@ -1,6 +1,9 @@
 .venv/
 __pycache__/
 outputs/
+outputs
+_outputs
+.env
 *.egg-info/
 wandb
 *_refer.py

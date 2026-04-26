@@ -523,7 +523,7 @@ class Llava_Llada(lmms):
             # In image_gen, image and text rollouts run as separate phases so they can
             # be batched differently: image uses the outer chunk (batch_size), text
             # scales inversely with max_new_tokens.
-            text_batch_size = max(1, (2 ** 15) // gen_kwargs["max_new_tokens"])
+            text_batch_size = max(1, int(os.environ.get("TEXT_BATCH_BUDGET", 2 ** 15)) // gen_kwargs["max_new_tokens"])
             image_batch_size = batch_size
             t_gen0 = time.time()
             gen_result = self.inferencer._generate_mode(

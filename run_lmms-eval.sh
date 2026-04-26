@@ -15,12 +15,13 @@ CHAT_MODE=${CHAT_MODE:-image_gen} # text_gen,image_gen
 USE_BBOX=${USE_BBOX:-False}
 CKPT_INDEX=$1
 shift
+
 declare -a CKPTS=(
-  "/scratch2/yoonjeon.kim/LaViDa-O" # mmmu_val,vstar_bench,blink,chartqa done => add scienceqa_img,cv_bench,VisualPuzzles_cot,mmstar
-  "/scratch2/yoonjeon.kim/sft_LaViDa-O-thinkmorph_zebracot-step9000" # mmmu_val,vstar_bench,blink,chartqa done => add scienceqa_img,cv_bench,VisualPuzzles_cot,mmstar
-  "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-LavidaO/checkpoint-50" # add mmmu_val(900),vstar_bench(191),blink(1,901),chartqa(2,500),scienceqa_img(2,017),cv_bench(2,638),VisualPuzzles_cot(1,168),mmstar(1,500)
+#   "/scratch2/yoonjeon.kim/LaViDa-O" # mmmu_val,vstar_bench,blink,chartqa done => add scienceqa_img,cv_bench,VisualPuzzles_cot,mmstar
+#   "/scratch2/yoonjeon.kim/sft_LaViDa-O-thinkmorph_zebracot-step9000" # mmmu_val,vstar_bench,blink,chartqa done => add scienceqa_img,cv_bench,VisualPuzzles_cot,mmstar
   "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50"
   "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-region-edit-LavidaO/checkpoint-50"
+  "yjyjyj98/thinkmorph_answer-LavidaO-ckpt50"
 )
 if [[ -z "${CKPT_INDEX}" ]]; then
     echo "Error: CKPT_INDEX (first positional argument) is required. Valid range: 0-$((${#CKPTS[@]} - 1))" >&2
@@ -48,7 +49,7 @@ export DEBUG_PRINT_IMAGE_RES=1
 export DEBUG_FIX_PADDING=1
 
 MODEL_NAME=$(basename "$(dirname "$CKPT")")-$(basename "$CKPT")
-BASE_DIR="outputs"
+BASE_DIR="${BASE_DIR:-/scratch2/yoonjeon.kim/outputs}"
 
 OUTPUT_DIR="${BASE_DIR}/${CHAT_MODE}_usebbox${USE_BBOX}_default/${MODEL_NAME}"
 
