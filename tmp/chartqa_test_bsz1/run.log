@@ -1,0 +1,201 @@
+[32m2026-04-26 12:19:11.433[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m330[0m - [1mVerbosity set to INFO[0m
+[32m2026-04-26 12:19:12.897[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m398[0m - [1mEvaluation tracker args: {'output_path': '/home/yoonjeon.kim/dLLM-EVAL/tmp/chartqa_test_bsz1'}[0m
+[32m2026-04-26 12:19:12.898[0m | [33m[1mWARNING [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m420[0m - [33m[1m --limit SHOULD ONLY BE USED FOR TESTING.REAL METRICS SHOULD NOT BE COMPUTED USING LIMIT.[0m
+[32m2026-04-26 12:19:12.898[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m487[0m - [1mSelected Tasks: ['chartqa'][0m
+[32m2026-04-26 12:19:12.899[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m169[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+[32m2026-04-26 12:19:12.899[0m | [33m[1mWARNING [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m175[0m - [33m[1mgeneration_kwargs specified through cli, these settings will be used over set parameters in yaml tasks.[0m
+You are using a model of type llada to instantiate a model of type llava_llada. This is not supported for all configurations of models and can yield errors.
+OpenCLIP not installed
+Loaded LLaVA model: /scratch2/yoonjeon.kim/LaViDa-O
+-----config--------------
+LlavaLladaConfig {
+  "activation_type": "silu",
+  "add_faster_video": false,
+  "add_time_instruction": false,
+  "alibi": false,
+  "alibi_bias_max": 8.0,
+  "architectures": [
+    "LlavaLladaForMaskedDiffusion"
+  ],
+  "attention_dropout": 0.0,
+  "attention_layer_norm": false,
+  "attention_layer_norm_with_affine": true,
+  "auto_map": {},
+  "bias_for_layer_norm": false,
+  "block_group_size": 1,
+  "block_type": "llama",
+  "d_model": 4096,
+  "d_model_gen": 2048,
+  "downsample": true,
+  "dual_tower": true,
+  "dual_tower_layers": 16,
+  "effective_n_kv_heads": 32,
+  "embedding_dropout": 0.0,
+  "embedding_size": 127378,
+  "enc_use_image_branch": true,
+  "eos_token_id": 126081,
+  "faster_token_stride": 10,
+  "flash_attention": false,
+  "force_sample": false,
+  "gen_mlp_type": "dit2",
+  "image_aspect_ratio": "anyres",
+  "image_crop_resolution": null,
+  "image_enc_drop_rate": 0.5,
+  "image_grid_pinpoints": [
+    [
+      384,
+      768
+    ],
+    [
+      768,
+      384
+    ],
+    [
+      768,
+      768
+    ],
+    [
+      1152,
+      384
+    ],
+    [
+      384,
+      1152
+    ]
+  ],
+  "image_split_resolution": null,
+  "include_bias": false,
+  "include_qkv_bias": false,
+  "init_cutoff_factor": null,
+  "init_device": "cpu",
+  "init_fn": "mitchell",
+  "init_std": 0.02,
+  "input_emb_norm": false,
+  "layer_norm_type": "rms",
+  "layer_norm_with_affine": true,
+  "mask_token_id": 126336,
+  "max_sequence_length": 4096,
+  "mlp_hidden_size": 12288,
+  "mlp_hidden_size_gen": 8192,
+  "mlp_ratio": 4,
+  "mm_hidden_size": 1152,
+  "mm_newline_position": "grid",
+  "mm_patch_merge_type": "spatial_unpad",
+  "mm_pooler_ratio": 2,
+  "mm_projector_lr": null,
+  "mm_projector_type": "mlp2x_gelu",
+  "mm_resampler_type": "spatial_pool",
+  "mm_spatial_pool_mode": "conv",
+  "mm_spatial_pool_out_channels": 1152,
+  "mm_spatial_pool_stride": 2,
+  "mm_tunable_parts": "mm_vision_tower,mm_mlp_adapter,mm_vision_resampler,mm_language_model,mm_language_model_vision_parms",
+  "mm_use_im_patch_token": false,
+  "mm_use_im_start_end": false,
+  "mm_vision_select_feature": "patch",
+  "mm_vision_select_layer": -2,
+  "mm_vision_tower": "google/siglip-so400m-patch14-384",
+  "mm_vision_tower_lr": 2e-06,
+  "mm_vqvae": "jacklishufan/LaViDa-O-v1.0",
+  "model_type": "llava_llada",
+  "multi_query_attention": null,
+  "n_heads": 32,
+  "n_kv_heads": 32,
+  "n_layers": 32,
+  "pad_token_id": 126081,
+  "pos_skipping_range": 4096,
+  "precision": "amp_bf16",
+  "prompt_drop_rate": 0.1,
+  "resampler_type": null,
+  "residual_dropout": 0.0,
+  "rms_norm_eps": 1e-05,
+  "rope": true,
+  "rope_full_precision": true,
+  "rope_theta": 500000.0,
+  "scale_logits": false,
+  "tie_word_embeddings": false,
+  "tokenizer_model_max_length": 8192,
+  "tokenizer_padding_side": "right",
+  "torch_dtype": "float16",
+  "transformers_version": "4.53.3",
+  "use_cache": false,
+  "use_mm_proj": true,
+  "use_pos_skipping": false,
+  "vision_tower_pretrained": null,
+  "vocab_size": 127378,
+  "weight_tying": false
+}
+
+Loading vision tower: google/siglip-so400m-patch14-384
+google/siglip-so400m-patch14-384
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:02<00:08,  2.14s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:04<00:06,  2.16s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:06<00:04,  2.13s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:08<00:02,  2.09s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:10<00:00,  2.17s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:10<00:00,  2.15s/it]
+Model Class: LlavaLladaForMaskedDiffusion
+[32m2026-04-26 12:19:34.352[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m100[0m - [1mNo metadata found in task config for chartqa, using default n_shot=0[0m
+[32m2026-04-26 12:19:34.352[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m470[0m - [1mBuilding contexts for chartqa on rank 0...[0m
+  0%|          | 0/16 [00:00<?, ?it/s]100%|██████████| 16/16 [00:00<00:00, 18285.79it/s]
+[32m2026-04-26 12:19:34.354[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m657[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/16 [00:00<?, ?it/s]Model Responding:   6%|▋         | 1/16 [00:01<00:22,  1.51s/it]Model Responding:  12%|█▎        | 2/16 [00:02<00:16,  1.18s/it]Model Responding:  19%|█▉        | 3/16 [00:03<00:13,  1.05s/it]Model Responding:  25%|██▌       | 4/16 [00:04<00:12,  1.00s/it]Model Responding:  31%|███▏      | 5/16 [00:05<00:10,  1.02it/s]Model Responding:  38%|███▊      | 6/16 [00:06<00:09,  1.05it/s]Model Responding:  44%|████▍     | 7/16 [00:07<00:08,  1.05it/s]Model Responding:  50%|█████     | 8/16 [00:08<00:07,  1.04it/s]Model Responding:  56%|█████▋    | 9/16 [00:09<00:06,  1.03it/s]Model Responding:  62%|██████▎   | 10/16 [00:09<00:05,  1.05it/s]Model Responding:  69%|██████▉   | 11/16 [00:10<00:04,  1.06it/s]Model Responding:  75%|███████▌  | 12/16 [00:11<00:03,  1.02it/s]Model Responding:  81%|████████▏ | 13/16 [00:12<00:02,  1.02it/s]Model Responding:  88%|████████▊ | 14/16 [00:13<00:01,  1.01it/s]Model Responding:  94%|█████████▍| 15/16 [00:14<00:00,  1.01it/s]Model Responding: 100%|██████████| 16/16 [00:15<00:00,  1.03it/s]Model Responding: 100%|██████████| 16/16 [00:15<00:00,  1.01it/s]
+Preprocess:Image Aspect Ratio anyres
+(384, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 1): 1.5018341541290283
+Preprocess:Image Aspect Ratio anyres
+(384, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 2): 1.2298028469085693
+Preprocess:Image Aspect Ratio anyres
+(768, 384)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 3): 1.1177509625752766
+Preprocess:Image Aspect Ratio anyres
+(384, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 4): 1.0676149129867554
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 5): 1.0422256946563722
+Preprocess:Image Aspect Ratio anyres
+(384, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 6): 1.0186969836552937
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 7): 1.0090819086347307
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 8): 1.005541831254959
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 9): 1.001800325181749
+Preprocess:Image Aspect Ratio anyres
+(384, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 10): 0.9922410011291504
+Preprocess:Image Aspect Ratio anyres
+(768, 384)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 11): 0.9874828295274214
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 12): 0.9929260412851969
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 13): 0.9913942813873291
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 14): 0.9920605080468314
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 15): 0.9915894985198974
+Preprocess:Image Aspect Ratio anyres
+(384, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 16): 0.9872919917106628
+Postprocessing:   0%|          | 0/16 [00:00<?, ?it/s]Postprocessing: 100%|██████████| 16/16 [00:00<00:00, 34361.94it/s]

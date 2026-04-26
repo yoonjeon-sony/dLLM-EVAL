@@ -35,11 +35,8 @@ CKPT="${CKPTS[${CKPT_INDEX}]}"
 LIMIT=${LIMIT:-}
 NUM_GPUS=${NUM_GPUS:-2}
 TASKS=${TASKS:-} 
-# "blink_jigsaw,vstar_bench,cv_bench,chartqa,mmvet,VisPuzzle_direct,
-# mathvista_testmini_cot,mathverse_testmini,dynamath_reasoning"
-# thinkmorph_visual_search,thinkmorph_spatial_navigation,thinkmorph_jigsaw_assembly,thinkmorph_chart_refocus
 
-
+# TASKS="mmvet,mmstar,mmmu_val,vstar_bench,cv_bench_reasoning,chartqa,blink_jigsaw,VisualPuzzles_cot"
 SAVE_PARITY_CASES=${SAVE_PARITY_CASES:-0}
 PARITY_CASES_ROOT=${PARITY_CASES_ROOT:-DEBUG/parity_text_gen}
 PARITY_CASES_MAX_PER_TASK=${PARITY_CASES_MAX_PER_TASK:-4}
@@ -89,8 +86,6 @@ ${LAUNCH_CMD} ${LAUNCH_ARGS} \
     "${LIMIT_ARGS[@]}" \
     "${PARITY_ARGS[@]}" \
     "$@"
-
-    # ,max_new_tokens=${MAX_NEW_TOKENS},block_length=${BLOCK_LENGTH},step_per_block=${STEP_PER_BLOCK},temperature=${TEMPERATURE}
 
 echo "Done evaluating checkpoint: ${CKPT}"
 echo "Results saved to: ${OUTPUT_DIR}"

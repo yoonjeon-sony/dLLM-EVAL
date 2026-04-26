@@ -1,0 +1,233 @@
+[32m2026-04-26 12:30:25.558[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m330[0m - [1mVerbosity set to INFO[0m
+[32m2026-04-26 12:30:27.021[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m398[0m - [1mEvaluation tracker args: {'output_path': '/home/yoonjeon.kim/dLLM-EVAL/tmp/chartqa_test_2'}[0m
+[32m2026-04-26 12:30:27.021[0m | [33m[1mWARNING [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m420[0m - [33m[1m --limit SHOULD ONLY BE USED FOR TESTING.REAL METRICS SHOULD NOT BE COMPUTED USING LIMIT.[0m
+[32m2026-04-26 12:30:27.022[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m487[0m - [1mSelected Tasks: ['chartqa'][0m
+[32m2026-04-26 12:30:27.023[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m169[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+[32m2026-04-26 12:30:27.023[0m | [33m[1mWARNING [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m175[0m - [33m[1mgeneration_kwargs specified through cli, these settings will be used over set parameters in yaml tasks.[0m
+You are using a model of type llada to instantiate a model of type llava_llada. This is not supported for all configurations of models and can yield errors.
+OpenCLIP not installed
+Loaded LLaVA model: /scratch2/yoonjeon.kim/LaViDa-O
+-----config--------------
+LlavaLladaConfig {
+  "activation_type": "silu",
+  "add_faster_video": false,
+  "add_time_instruction": false,
+  "alibi": false,
+  "alibi_bias_max": 8.0,
+  "architectures": [
+    "LlavaLladaForMaskedDiffusion"
+  ],
+  "attention_dropout": 0.0,
+  "attention_layer_norm": false,
+  "attention_layer_norm_with_affine": true,
+  "auto_map": {},
+  "bias_for_layer_norm": false,
+  "block_group_size": 1,
+  "block_type": "llama",
+  "d_model": 4096,
+  "d_model_gen": 2048,
+  "downsample": true,
+  "dual_tower": true,
+  "dual_tower_layers": 16,
+  "effective_n_kv_heads": 32,
+  "embedding_dropout": 0.0,
+  "embedding_size": 127378,
+  "enc_use_image_branch": true,
+  "eos_token_id": 126081,
+  "faster_token_stride": 10,
+  "flash_attention": false,
+  "force_sample": false,
+  "gen_mlp_type": "dit2",
+  "image_aspect_ratio": "anyres",
+  "image_crop_resolution": null,
+  "image_enc_drop_rate": 0.5,
+  "image_grid_pinpoints": [
+    [
+      384,
+      768
+    ],
+    [
+      768,
+      384
+    ],
+    [
+      768,
+      768
+    ],
+    [
+      1152,
+      384
+    ],
+    [
+      384,
+      1152
+    ]
+  ],
+  "image_split_resolution": null,
+  "include_bias": false,
+  "include_qkv_bias": false,
+  "init_cutoff_factor": null,
+  "init_device": "cpu",
+  "init_fn": "mitchell",
+  "init_std": 0.02,
+  "input_emb_norm": false,
+  "layer_norm_type": "rms",
+  "layer_norm_with_affine": true,
+  "mask_token_id": 126336,
+  "max_sequence_length": 4096,
+  "mlp_hidden_size": 12288,
+  "mlp_hidden_size_gen": 8192,
+  "mlp_ratio": 4,
+  "mm_hidden_size": 1152,
+  "mm_newline_position": "grid",
+  "mm_patch_merge_type": "spatial_unpad",
+  "mm_pooler_ratio": 2,
+  "mm_projector_lr": null,
+  "mm_projector_type": "mlp2x_gelu",
+  "mm_resampler_type": "spatial_pool",
+  "mm_spatial_pool_mode": "conv",
+  "mm_spatial_pool_out_channels": 1152,
+  "mm_spatial_pool_stride": 2,
+  "mm_tunable_parts": "mm_vision_tower,mm_mlp_adapter,mm_vision_resampler,mm_language_model,mm_language_model_vision_parms",
+  "mm_use_im_patch_token": false,
+  "mm_use_im_start_end": false,
+  "mm_vision_select_feature": "patch",
+  "mm_vision_select_layer": -2,
+  "mm_vision_tower": "google/siglip-so400m-patch14-384",
+  "mm_vision_tower_lr": 2e-06,
+  "mm_vqvae": "jacklishufan/LaViDa-O-v1.0",
+  "model_type": "llava_llada",
+  "multi_query_attention": null,
+  "n_heads": 32,
+  "n_kv_heads": 32,
+  "n_layers": 32,
+  "pad_token_id": 126081,
+  "pos_skipping_range": 4096,
+  "precision": "amp_bf16",
+  "prompt_drop_rate": 0.1,
+  "resampler_type": null,
+  "residual_dropout": 0.0,
+  "rms_norm_eps": 1e-05,
+  "rope": true,
+  "rope_full_precision": true,
+  "rope_theta": 500000.0,
+  "scale_logits": false,
+  "tie_word_embeddings": false,
+  "tokenizer_model_max_length": 8192,
+  "tokenizer_padding_side": "right",
+  "torch_dtype": "float16",
+  "transformers_version": "4.53.3",
+  "use_cache": false,
+  "use_mm_proj": true,
+  "use_pos_skipping": false,
+  "vision_tower_pretrained": null,
+  "vocab_size": 127378,
+  "weight_tying": false
+}
+
+Loading vision tower: google/siglip-so400m-patch14-384
+google/siglip-so400m-patch14-384
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:02<00:08,  2.12s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:04<00:06,  2.13s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:06<00:04,  2.13s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:08<00:02,  2.09s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:10<00:00,  2.17s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:10<00:00,  2.15s/it]
+Model Class: LlavaLladaForMaskedDiffusion
+[32m2026-04-26 12:30:48.769[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m100[0m - [1mNo metadata found in task config for chartqa, using default n_shot=0[0m
+[32m2026-04-26 12:30:48.769[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m470[0m - [1mBuilding contexts for chartqa on rank 0...[0m
+  0%|          | 0/16 [00:00<?, ?it/s]100%|██████████| 16/16 [00:00<00:00, 15978.30it/s]
+[32m2026-04-26 12:30:48.771[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m657[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/8 [00:00<?, ?it/s][gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[8647, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='Yes<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='Yes'
+  row 1: ids=[17, 16, 13, 20, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='21.5<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='21.5'
+Model Responding:  12%|█▎        | 1/8 [00:02<00:19,  2.78s/it]Avg Latency (of 2): 1.3875092267990112
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[17, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='2<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='2'
+  row 1: ids=[21, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='6<|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='6'
+Model Responding:  25%|██▌       | 2/8 [00:04<00:14,  2.45s/it]Avg Latency (of 4): 1.2465288043022156
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[15, 13, 15, 23, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='0.08<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='0.08'
+  row 1: ids=[126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped=''
+Model Responding:  38%|███▊      | 3/8 [00:07<00:11,  2.36s/it]Avg Latency (of 6): 1.2061903476715088
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped=''
+  row 1: ids=[18, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='3<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='3'
+Model Responding:  50%|█████     | 4/8 [00:09<00:09,  2.30s/it]Avg Latency (of 8): 1.1796750724315643
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[17, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='2<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='2'
+  row 1: ids=[126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='<|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped=''
+Model Responding:  62%|██████▎   | 5/8 [00:11<00:06,  2.25s/it]Avg Latency (of 10): 1.1601060390472413
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='<|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped=''
+  row 1: ids=[4127, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='No<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='No'
+Model Responding:  75%|███████▌  | 6/8 [00:13<00:04,  2.21s/it]Avg Latency (of 12): 1.144137720266978
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='<|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped=''
+  row 1: ids=[10805, 759, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='Depry<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='Depry'
+Model Responding:  88%|████████▊ | 7/8 [00:15<00:02,  2.20s/it]Avg Latency (of 14): 1.134819848196847
+[gen step 0] before_mask=[16, 16] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[14, 14]
+[gen step 1] before_mask=[14, 14] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[12, 12]
+[gen step 2] before_mask=[12, 12] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[10, 10]
+[gen step 3] before_mask=[10, 10] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[8, 8]
+[gen step 4] before_mask=[8, 8] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[6, 6]
+[gen step 5] before_mask=[6, 6] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[4, 4]
+[gen step 6] before_mask=[4, 4] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[2, 2]
+[gen step 7] before_mask=[2, 2] pred_was_mask=[0, 0] transferred=[2, 2] after_mask=[0, 0]
+[gen-final] x[:, :] tokens (decoded per row):
+  row 0: ids=[18, 126348, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='3<|eot_id|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped='3'
+  row 1: ids=[126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081, 126081] | with_special='<|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>' | stripped=''
+Model Responding: 100%|██████████| 8/8 [00:18<00:00,  2.22s/it]Model Responding: 100%|██████████| 8/8 [00:18<00:00,  2.28s/it]
+Avg Latency (of 16): 1.1345736235380173
+Postprocessing:   0%|          | 0/16 [00:00<?, ?it/s]Postprocessing: 100%|██████████| 16/16 [00:00<00:00, 34186.89it/s]

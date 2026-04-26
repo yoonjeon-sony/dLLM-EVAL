@@ -527,8 +527,6 @@ class LlavaLladaForMaskedDiffusion(LLaDAModelLM,LlavaMetaForCausalLM):
                 final_masked_indices = torch.cat([final_masked_indices,final_masked_indices_inv])
             seq_len = labels.shape[-1]
             # print(seq_len)
-            if LOG_BATCH_LENGTH:
-                print("Batch Length",seq_len)
             if images_gen is not None:
                 n_image_tokens = (
                     (new_input_ids == -200).sum(dim=-1).max().item()
@@ -848,7 +846,7 @@ class LlavaLladaForMaskedDiffusion(LLaDAModelLM,LlavaMetaForCausalLM):
 
         x0 = xt.clone()
         xt_history = []
-        print("num_transfer_tokens", num_transfer_tokens.shape) # bsz, n_steps
+        # print("num_transfer_tokens", num_transfer_tokens.shape) # bsz, n_steps
         active_steps = torch.nonzero(num_transfer_tokens.sum(dim=0) > 0, as_tuple=False).squeeze(-1)
         for step_idx, step_col in enumerate(
             tqdm(active_steps, desc=f"Region editing {batch_size} images"), start=1
@@ -1069,15 +1067,48 @@ class LlavaLladaForMaskedDiffusion(LLaDAModelLM,LlavaMetaForCausalLM):
         else:
             past_key_values = None
             prefix_attention_mask = attention_mask
+            prefix_pos_ids = None
+            gen_pos_ids = None
+            kv_pos_ids = None
             if prefix_lm:
                 if input_modality_indices is None and t2i_inference:
                     input_modality_indices = torch.zeros(inputs_embeds.shape[:-1], dtype=torch.bool, device=inputs_embeds.device)
+                # Per-row RoPE position_ids when left-padding is in play. Real tokens
+                # get 0..L_real-1; padded slots reuse 0 (their attention is masked).
+                # Without this, sample-A's prompt sits at absolute positions [P..L)
+                # in RoPE while sample-B's is at [0..L) — same content, different
+                # relative geometry to the gen window across batch rows.
+                has_padding = (
+                    prefix_attention_mask is not None
+                    and (prefix_attention_mask == 0).any()
+                )
+                if has_padding:
+                    cum = prefix_attention_mask.long().cumsum(-1)
+                    prefix_pos_ids = (cum - 1).clamp(min=0)
+                    real_lengths = prefix_attention_mask.long().sum(-1)
+                    gen_offsets = torch.arange(
+                        gen_length, device=prefix_attention_mask.device, dtype=torch.long
+                    ).unsqueeze(0)
+                    gen_pos_ids = real_lengths.unsqueeze(-1) + gen_offsets
+                    kv_pos_ids = torch.cat([prefix_pos_ids, gen_pos_ids], dim=-1)
+                # Bypass the causal default at modeling_llada.py:1582 by passing an
+                # explicit non-causal float bias. LLaDA was trained bidirectionally
+                # over the prompt; combining causal + padding mask corrupts the
+                # cached KVs only for bsz>1 (where attention_mask is non-None).
+                prefix_len = inputs_embeds.shape[1]
+                prefix_attention_bias = torch.zeros(
+                    1, 1, prefix_len, prefix_len,
+                    dtype=torch.float, device=inputs_embeds.device,
+                )
                 past_key_values = model(
                     None,
                     input_embeddings=inputs_embeds,
                     attention_mask=prefix_attention_mask,
+                    attention_bias=prefix_attention_bias,
                     use_cache=True,
-                    modality_indices=input_modality_indices
+                    modality_indices=input_modality_indices,
+                    q_pos_ids=prefix_pos_ids,
+                    k_pos_ids=prefix_pos_ids,
                 ).attn_key_values
                 x = torch.full((bsz, gen_length), mask_id, dtype=torch.long).to(model.device)
                 prompt = torch.full((bsz, 0), 0, dtype=torch.long).to(model.device)
@@ -1145,6 +1176,11 @@ class LlavaLladaForMaskedDiffusion(LLaDAModelLM,LlavaMetaForCausalLM):
                                 )
                             else:
                                 full_attention_mask = None
+                            full_len = past_key_values[0][0].shape[-2] + inputs_embeds_curr.shape[1]
+                            full_attention_bias = torch.zeros(
+                                1, 1, full_len, full_len,
+                                dtype=torch.float, device=inputs_embeds_curr.device,
+                            )
                             logits = get_logits(
                                 model,
                                 inputs_embeds_curr,
@@ -1152,6 +1188,9 @@ class LlavaLladaForMaskedDiffusion(LLaDAModelLM,LlavaMetaForCausalLM):
                                 t2i_inference,
                                 past_key_values=past_key_values,
                                 attention_mask=full_attention_mask,
+                                attention_bias=full_attention_bias,
+                                q_pos_ids=gen_pos_ids,
+                                k_pos_ids=kv_pos_ids,
                             )
                         else:
                             if inputs_embeds is not None:

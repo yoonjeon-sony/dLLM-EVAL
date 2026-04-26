@@ -169,7 +169,20 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 model = LlavaMistralForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, **kwargs)
             elif "llada" in model_name.lower():
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-                model = LlavaLladaForMaskedDiffusion.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation='eager', **kwargs)
+                # Force-import in-tree class: strip auto_map so HuggingFace cannot
+                # silently substitute a stale modeling_llada from another sys.path
+                # location (which lacks the q_pos_ids/k_pos_ids kwargs).
+                llada_cfg = LlavaLladaConfig.from_pretrained(model_path)
+                if hasattr(llada_cfg, "auto_map"):
+                    llada_cfg.auto_map = {}
+                model = LlavaLladaForMaskedDiffusion.from_pretrained(
+                    model_path,
+                    low_cpu_mem_usage=True,
+                    attn_implementation='eager',
+                    config=llada_cfg,
+                    trust_remote_code=False,
+                    **kwargs,
+                )
             elif "dream" in model_name.lower():
                 tokenizer = AutoTokenizer.from_pretrained(model_path,trust_remote_code=True)
                 model = LlavaDreamForMaskedDiffusion.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation='eager', **kwargs)

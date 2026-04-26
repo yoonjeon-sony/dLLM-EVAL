@@ -186,15 +186,18 @@ def logit_normal_schedule(shift,sigmas):
 
 INT_MAX = 1_000_000
 def get_logits(
-    model, 
-    input_emnbeddings, 
-    modality_indices=None, 
-    t2i_inference=False, 
+    model,
+    input_emnbeddings,
+    modality_indices=None,
+    t2i_inference=False,
     past_key_values=None,
     gen_shape=None,
     timesteps=None,
     input_modality_indices=None,
     attention_mask=None,
+    q_pos_ids=None,
+    k_pos_ids=None,
+    attention_bias=None,
     ):
     if t2i_inference:
         if input_modality_indices is None:
@@ -203,10 +206,13 @@ def get_logits(
             None,
             input_embeddings=input_emnbeddings,
             attention_mask=attention_mask,
+            attention_bias=attention_bias,
             modality_indices=input_modality_indices,
             return_last_hidden_state_only=True,
             compute_logits=False,
             past_key_values=past_key_values,
+            q_pos_ids=q_pos_ids,
+            k_pos_ids=k_pos_ids,
         )
         hidden_states = output.hidden_states[0]
         gen_hidden_states = hidden_states[modality_indices]
@@ -219,17 +225,20 @@ def get_logits(
             gen_logits = gen_logits.view(-1,seq_len_per_img,*gen_logits.shape[-2:])
             # N L 8 D
         return gen_logits
-        
-        
+
+
 
     else:
         # Text-only scoring should not activate the dual-tower modality path.
         logits = model(
             None,
             attention_mask=attention_mask,
+            attention_bias=attention_bias,
             input_embeddings=input_emnbeddings,
             modality_indices=None,
             past_key_values=past_key_values,
+            q_pos_ids=q_pos_ids,
+            k_pos_ids=k_pos_ids,
         ).logits
     return logits
 

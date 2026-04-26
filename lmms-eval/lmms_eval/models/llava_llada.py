@@ -194,6 +194,15 @@ class Llava_Llada(lmms):
         assert self._tokenizer is not None
 
         self._config = self._model.config
+        # Force left-padding so right-aligned prompts let RoPE storage positions
+        # naturally place gen tokens at L_real..L_real+gen-1 per row without needing
+        # per-row position_ids hacks. The model config defaults to "right" but
+        # batched generation breaks under right-pad + storage RoPE.
+        if os.environ.get("FORCE_LEFT_PAD", "1") not in ("0", "false", "False"):
+            try:
+                setattr(self._model.config, "tokenizer_padding_side", "left")
+            except Exception:
+                pass
         self.processing_class = LavidaOProcessor(self._model, self._tokenizer, self._image_processor)
         self.model.eval()
         self.model.tie_weights()
@@ -523,7 +532,12 @@ class Llava_Llada(lmms):
             # In image_gen, image and text rollouts run as separate phases so they can
             # be batched differently: image uses the outer chunk (batch_size), text
             # scales inversely with max_new_tokens.
-            text_batch_size = max(1, int(os.environ.get("TEXT_BATCH_BUDGET", 2 ** 15)) // gen_kwargs["max_new_tokens"])
+            # Multiplicative knob for OOM retries: queue_runner halves TEXT_BATCH_SCALE
+            # before re-launching a cell that hit CUDA OOM, leaving TEXT_BATCH_BUDGET as
+            # the static budget.
+            _budget = int(os.environ.get("TEXT_BATCH_BUDGET", 2 ** 15))
+            _scale  = float(os.environ.get("TEXT_BATCH_SCALE", 1.0))
+            text_batch_size = max(1, int(_scale * _budget) // gen_kwargs["max_new_tokens"])
             image_batch_size = batch_size
             t_gen0 = time.time()
             gen_result = self.inferencer._generate_mode(

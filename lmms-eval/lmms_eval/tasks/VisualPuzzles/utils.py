@@ -15,7 +15,7 @@ def extract_xml_answer(text: str) -> str:
 
 
 def VisualPuzzles_doc_to_visual(doc):
-    return [doc["problem_image"]]
+    return [doc["image"]]
 
 
 def VisualPuzzles_doc_to_text(doc, lmms_eval_specific_kwargs):

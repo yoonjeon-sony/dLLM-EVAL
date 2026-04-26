@@ -1090,6 +1090,8 @@ class LLaDALlamaBlock(LLaDABlock):
         block_mask = None,
         modality_indices = None,
         replace_position: Optional[torch.Tensor] = None,
+        q_pos_ids: Optional[torch.Tensor] = None,
+        k_pos_ids: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
         # Get query, key, value projections.
         # shape:
@@ -1205,10 +1207,10 @@ class LLaDALlamaBlock(LLaDABlock):
         else:
             if self._activation_checkpoint_fn is not None:
                 att, cache = self._activation_checkpoint_fn(  # type: ignore
-                    self.attention, q, k, v, attention_bias, layer_past=layer_past, use_cache=use_cache,block_mask=block_mask,replace_position=replace_position
+                    self.attention, q, k, v, attention_bias, layer_past=layer_past, use_cache=use_cache,block_mask=block_mask,replace_position=replace_position,q_pos_id=q_pos_ids,k_pos_id=k_pos_ids
                 )
             else:
-                att, cache = self.attention(q, k, v, attention_bias, layer_past=layer_past, use_cache=use_cache,block_mask=block_mask,replace_position=replace_position)
+                att, cache = self.attention(q, k, v, attention_bias, layer_past=layer_past, use_cache=use_cache,block_mask=block_mask,replace_position=replace_position,q_pos_id=q_pos_ids,k_pos_id=k_pos_ids)
 
         # Add attention scores.
         # shape: (B, T, C)
@@ -1495,6 +1497,8 @@ class LLaDAModel(nn.Module):
         prefix_length=None,
         modality_indices=None,
         replace_position: Optional[torch.Tensor] = None,
+        q_pos_ids: Optional[torch.Tensor] = None,
+        k_pos_ids: Optional[torch.Tensor] = None,
     ) -> LLaDAOutput:
         """
         :param input_ids: A tensor of shape `(batch_size, seq_len)`.
@@ -1650,11 +1654,11 @@ class LLaDAModel(nn.Module):
                     #     block, x, attention_bias=attention_bias, layer_past=layer_past, use_cache=use_cache
                     # )
                     x, cache = self._activation_checkpoint_fn(
-                        block, x, attention_bias, layer_past, use_cache,block_mask,modality_indices,replace_position
+                        block, x, attention_bias, layer_past, use_cache,block_mask,modality_indices,replace_position,q_pos_ids,k_pos_ids
                     )
                 else:
                     # shape: (batch_size, seq_len, d_model)
-                    x, cache = block(x, attention_bias=attention_bias, layer_past=layer_past, use_cache=use_cache,block_mask=block_mask,modality_indices=modality_indices,replace_position=replace_position)
+                    x, cache = block(x, attention_bias=attention_bias, layer_past=layer_past, use_cache=use_cache,block_mask=block_mask,modality_indices=modality_indices,replace_position=replace_position,q_pos_ids=q_pos_ids,k_pos_ids=k_pos_ids)
                 if attn_key_values is not None:
                     assert cache is not None
                     attn_key_values.append(cache)

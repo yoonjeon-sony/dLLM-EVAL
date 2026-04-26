@@ -37,16 +37,20 @@ CKPT_DIRS = {
     "Unified-cp50":           "thinkmorph_interleave-Unified-LavidaO-checkpoint-50",
     "region-edit-cp50":       "thinkmorph_interleave-region-edit-LavidaO-checkpoint-50",
     "answer-LavidaO-ckpt50":  "yjyjyj98-thinkmorph_answer-LavidaO-ckpt50",
+    "edit-LavidaO-ckpt50":    "yjyjyj98-thinkmorph_edit-LavidaO-ckpt50",
+    "interleave-cp50":        "thinkmorph_interleave-LavidaO-checkpoint-50",
 }
 
 # task -> kind (drives both default and robust scoring)
 TASK_KIND = {
     "chartqa":                              "chartqa",
     "cv_bench":                             "cv_bench",
+    "cv_bench_reasoning":                   "cv_bench",   # judge-based default; robust = letter
     "blink_jigsaw":                         "letter",
     "vstar_bench":                          "vstar",
     "VisPuzzle_direct":                     "vispuzzle_direct",
     "mmstar":                               "mmstar",
+    "mmmu_val":                             "mmmu",
     "mmvet":                                "mmvet",
     "ai2d_lite":                            "ai2d",
     "mathverse_testmini_vision_dominant":   "mathverse",
@@ -412,6 +416,18 @@ def score_record(rec, kind):
         r_pred = "(heuristic substring)"
         r_ok = mmvet_robust_match(raw, target)
 
+    elif kind == "mmmu":
+        # Multi-choice (most of MMMU val) → letter parser; open-ended → substring.
+        d_pred = "(needs gpt-4 judge)"
+        d_ok = False
+        tgt = target.strip().upper()
+        if tgt and len(tgt) == 1 and tgt in "ABCDEFGHIJ":
+            r_pred = letter_robust_pred(raw, opts="ABCDEFGHIJ")
+            r_ok = r_pred == tgt
+        else:
+            r_pred = "(substring)"
+            r_ok = numeric_or_substring_match(raw, target)
+
     elif kind == "ai2d":
         d_ok = default_ai2d_lite(raw, target)
         d_pred = (raw or "").strip()[:30]
@@ -503,20 +519,9 @@ def _truncate(s: str, n: int) -> str:
     return s if len(s) <= n else s[: n - 3] + "..."
 
 
-def write_aggregate_report(matrix):
-    """matrix[root_label][task][ckpt_label] = stats or None"""
-    out = ["# Re-scored evaluation matrix (4 ROOTs × ckpts × tasks)\n",
-           "Re-scored with both lmms-eval's per-task default scorer (mirrored from "
-           "`lmms-eval/lmms_eval/tasks/<task>/utils.py`) and an extended robust parser "
-           "(`<answer>…</answer>` → `\\boxed{…}` → 'the answer is X' → 'Answer: X' → "
-           "trailing letter → raw fallback).\n",
-           "Tasks needing a GPT-4 judge (`mmvet`, `mathverse`, `mathvista`) report "
-           "default = `n/a` and rely on the robust heuristic match (numeric within 5% "
-           "or substring of gold answer).\n",
-           "Schema note: ROOT2/ROOT3 records store `resps[0][0]` as a plain string, "
-           "while ROOT wrap it in a dict with `text_gen_output`. The unified "
-           "`get_raw(rec)` handles both.\n"]
-
+def render_aggregate_body_md(matrix) -> str:
+    """Return the per-ROOT body tables as a markdown string. Pure, no I/O."""
+    out = []
     for root_label, root in ROOTS.items():
         out.append(f"\n## `{root_label}` — `{root.name}`\n")
         out.append("Each cell: `default% → robust% (Δ pp, correct/N)`. `—` = file missing.\n")
@@ -551,8 +556,53 @@ def write_aggregate_report(matrix):
                                 sorted(s["patterns"].items(), key=lambda kv: -kv[1])[:3])
                 out.append(f"| `{task}` | {ckpt_label} | {n} | {e_p:.2f} | {s_p:.2f} | {r_p:.2f} | {top} |")
         out.append("")
+    return "\n".join(out)
 
-    REPORT_PATH.write_text("\n".join(out))
+
+def build_full_matrix() -> dict:
+    """Walk every ROOT × CKPT × TASK file on disk and score it. Returns the matrix dict."""
+    matrix = {}
+    for root_label, root in ROOTS.items():
+        matrix[root_label] = {t: {} for t in TASK_KIND}
+        for ckpt_label, ckpt_dir in CKPT_DIRS.items():
+            for task, kind in TASK_KIND.items():
+                path = root / ckpt_dir / f"{task}.jsonl"
+                if not path.exists():
+                    matrix[root_label][task][ckpt_label] = None
+                    continue
+                matrix[root_label][task][ckpt_label] = score_one(load_jsonl(path), kind)
+    return matrix
+
+
+def score_jsonl_path(path: Path, task: str) -> dict | None:
+    """Score one jsonl. Returns the same shape as score_one(), or None if file missing."""
+    if not path.exists():
+        return None
+    kind = TASK_KIND.get(task)
+    if kind is None:
+        return None
+    return score_one(load_jsonl(path), kind)
+
+
+def write_aggregate_report(matrix, *, prefix_md: str = "") -> None:
+    """Write the full report. `prefix_md` is prepended (used by queue_runner for the
+    live progress matrix + per-job ETA section)."""
+    header = ["# Re-scored evaluation matrix (4 ROOTs × ckpts × tasks)\n",
+           "Re-scored with both lmms-eval's per-task default scorer (mirrored from "
+           "`lmms-eval/lmms_eval/tasks/<task>/utils.py`) and an extended robust parser "
+           "(`<answer>…</answer>` → `\\boxed{…}` → 'the answer is X' → 'Answer: X' → "
+           "trailing letter → raw fallback).\n",
+           "Tasks needing a GPT-4 judge (`mmvet`, `mathverse`, `mathvista`) report "
+           "default = `n/a` and rely on the robust heuristic match (numeric within 5% "
+           "or substring of gold answer).\n",
+           "Schema note: ROOT2/ROOT3 records store `resps[0][0]` as a plain string, "
+           "while ROOT wrap it in a dict with `text_gen_output`. The unified "
+           "`get_raw(rec)` handles both.\n"]
+    parts = ["\n".join(header)]
+    if prefix_md:
+        parts.append(prefix_md)
+    parts.append(render_aggregate_body_md(matrix))
+    REPORT_PATH.write_text("\n".join(parts))
 
 
 def write_parser_report(matrix_records):

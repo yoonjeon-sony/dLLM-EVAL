@@ -1,0 +1,351 @@
+MASTER_ADDR=127.0.0.1 MASTER_PORT=24493 NUM_GPUS=2
+Running with TASKS=VisualPuzzles_cot CKPT=/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50 CHAT_MODE=image_gen (batch_size auto-tuned from task max_new_tokens)
+The following values were not passed to `accelerate launch` and had defaults used instead:
+		More than one GPU was found, enabling multi-GPU training.
+		If this was unintended please pass in `--num_processes=1`.
+	`--mixed_precision` was set to a value of `'no'`
+	`--dynamo_backend` was set to a value of `'no'`
+To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
+[W426 12:14:27.231589405 socket.cpp:755] [c10d] The client socket cannot be initialized to connect to [::ffff:127.0.0.1]:24493 (errno: 97 - Address family not supported by protocol).
+[32m2026-04-26 12:14:32.476[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m330[0m - [1mVerbosity set to INFO[0m
+[32m2026-04-26 12:14:32.481[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate[0m:[36m330[0m - [1mVerbosity set to INFO[0m
+[W426 12:14:32.931112951 socket.cpp:755] [c10d] The client socket cannot be initialized to connect to [::ffff:127.0.0.1]:24493 (errno: 97 - Address family not supported by protocol).
+[W426 12:14:32.935068962 socket.cpp:755] [c10d] The client socket cannot be initialized to connect to [::ffff:127.0.0.1]:24493 (errno: 97 - Address family not supported by protocol).
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/irteam/.netrc.
+wandb: Currently logged in as: jeoni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+[32m2026-04-26 12:14:34.456[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m398[0m - [1mEvaluation tracker args: {'output_path': 'tmp/image_gen_usebboxFalse_default/thinkmorph_interleave-Unified-LavidaO-checkpoint-50'}[0m
+[32m2026-04-26 12:14:34.456[0m | [33m[1mWARNING [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m420[0m - [33m[1m --limit SHOULD ONLY BE USED FOR TESTING.REAL METRICS SHOULD NOT BE COMPUTED USING LIMIT.[0m
+[32m2026-04-26 12:14:34.456[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m487[0m - [1mSelected Tasks: ['VisualPuzzles_cot'][0m
+[32m2026-04-26 12:14:34.458[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m169[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+[32m2026-04-26 12:14:34.458[0m | [33m[1mWARNING [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m175[0m - [33m[1mgeneration_kwargs specified through cli, these settings will be used over set parameters in yaml tasks.[0m
+wandb: setting up run 08gr733j
+wandb: Tracking run with wandb version 0.25.1
+wandb: Run data is saved locally in /home/yoonjeon.kim/dLLM-EVAL/wandb/run-20260426_121434-08gr733j
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run debug
+wandb: ⭐️ View project at https://wandb.ai/jeoni/lmms-eval
+wandb: 🚀 View run at https://wandb.ai/jeoni/lmms-eval/runs/08gr733j
+wandb: Detected [openai] in use.
+wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
+wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
+[32m2026-04-26 12:14:37.191[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m398[0m - [1mEvaluation tracker args: {'output_path': 'tmp/image_gen_usebboxFalse_default/thinkmorph_interleave-Unified-LavidaO-checkpoint-50'}[0m
+[32m2026-04-26 12:14:37.191[0m | [33m[1mWARNING [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m420[0m - [33m[1m --limit SHOULD ONLY BE USED FOR TESTING.REAL METRICS SHOULD NOT BE COMPUTED USING LIMIT.[0m
+[32m2026-04-26 12:14:37.191[0m | [1mINFO    [0m | [36m__main__[0m:[36mcli_evaluate_single[0m:[36m487[0m - [1mSelected Tasks: ['VisualPuzzles_cot'][0m
+[32m2026-04-26 12:14:37.193[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m169[0m - [1mSetting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234[0m
+[32m2026-04-26 12:14:37.193[0m | [33m[1mWARNING [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m175[0m - [33m[1mgeneration_kwargs specified through cli, these settings will be used over set parameters in yaml tasks.[0m
+[32m2026-04-26 12:14:37.256[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m197[0m - [1mAuto batch_size = 32 (chat_mode=image_gen, image rollout fixed)[0m
+[32m2026-04-26 12:14:39.746[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36msimple_evaluate[0m:[36m197[0m - [1mAuto batch_size = 32 (chat_mode=image_gen, image rollout fixed)[0m
+OpenCLIP not installed
+OpenCLIP not installed
+google/siglip-so400m-patch14-384
+Rank 0:  Loaded LLaVA model: /scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50
+Rank 0:  -----config--------------
+Rank 0:  LlavaLladaConfig {
+  "activation_type": "silu",
+  "add_faster_video": false,
+  "add_time_instruction": false,
+  "alibi": false,
+  "alibi_bias_max": 8.0,
+  "architectures": [
+    "LlavaLladaForMaskedDiffusion"
+  ],
+  "attention_dropout": 0.0,
+  "attention_layer_norm": false,
+  "attention_layer_norm_with_affine": true,
+  "auto_map": {},
+  "bias_for_layer_norm": false,
+  "block_group_size": 1,
+  "block_type": "llama",
+  "d_model": 4096,
+  "d_model_gen": 2048,
+  "downsample": true,
+  "dual_tower": true,
+  "dual_tower_layers": 16,
+  "effective_n_kv_heads": 32,
+  "embedding_dropout": 0.0,
+  "embedding_size": 127380,
+  "enc_use_image_branch": true,
+  "eos_token_id": 126081,
+  "faster_token_stride": 10,
+  "flash_attention": false,
+  "force_sample": false,
+  "gen_mlp_type": "dit2",
+  "image_aspect_ratio": "anyres",
+  "image_crop_resolution": null,
+  "image_enc_drop_rate": 0.5,
+  "image_grid_pinpoints": [
+    [
+      384,
+      768
+    ],
+    [
+      768,
+      384
+    ],
+    [
+      768,
+      768
+    ],
+    [
+      1152,
+      384
+    ],
+    [
+      384,
+      1152
+    ]
+  ],
+  "image_split_resolution": null,
+  "include_bias": false,
+  "include_qkv_bias": false,
+  "init_cutoff_factor": null,
+  "init_device": "cpu",
+  "init_fn": "mitchell",
+  "init_std": 0.02,
+  "input_emb_norm": false,
+  "layer_norm_type": "rms",
+  "layer_norm_with_affine": true,
+  "mask_token_id": 126336,
+  "max_sequence_length": 4096,
+  "mlp_hidden_size": 12288,
+  "mlp_hidden_size_gen": 8192,
+  "mlp_ratio": 4,
+  "mm_hidden_size": 1152,
+  "mm_newline_position": "grid",
+  "mm_patch_merge_type": "spatial_unpad",
+  "mm_pooler_ratio": 2,
+  "mm_projector_lr": null,
+  "mm_projector_type": "mlp2x_gelu",
+  "mm_resampler_type": "spatial_pool",
+  "mm_spatial_pool_mode": "conv",
+  "mm_spatial_pool_out_channels": 1152,
+  "mm_spatial_pool_stride": 2,
+  "mm_tunable_parts": "mm_vision_tower,mm_mlp_adapter,mm_vision_resampler,mm_language_model,mm_language_model_vision_parms",
+  "mm_use_im_patch_token": false,
+  "mm_use_im_start_end": false,
+  "mm_vision_select_feature": "patch",
+  "mm_vision_select_layer": -2,
+  "mm_vision_tower": "google/siglip-so400m-patch14-384",
+  "mm_vision_tower_lr": 2e-06,
+  "mm_vqvae": "jacklishufan/LaViDa-O-v1.0",
+  "model_type": "llava_llada",
+  "multi_query_attention": null,
+  "n_heads": 32,
+  "n_kv_heads": 32,
+  "n_layers": 32,
+  "pad_token_id": 126081,
+  "pos_skipping_range": 4096,
+  "precision": "amp_bf16",
+  "prompt_drop_rate": 0.1,
+  "resampler_type": null,
+  "residual_dropout": 0.0,
+  "rms_norm_eps": 1e-05,
+  "rope": true,
+  "rope_full_precision": true,
+  "rope_theta": 500000.0,
+  "scale_logits": false,
+  "tie_word_embeddings": false,
+  "tokenizer_model_max_length": 8192,
+  "tokenizer_padding_side": "left",
+  "torch_dtype": "float16",
+  "transformers_version": "4.53.3",
+  "use_cache": false,
+  "use_mm_proj": true,
+  "use_pos_skipping": false,
+  "vision_tower_pretrained": null,
+  "vocab_size": 127380,
+  "weight_tying": false
+}
+
+Rank 0:  Loading vision tower: google/siglip-so400m-patch14-384
+google/siglip-so400m-patch14-384
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:02<00:08,  2.00s/it]Loading checkpoint shards:  20%|██        | 1/5 [00:01<00:07,  1.97s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:03<00:05,  1.98s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:03<00:05,  1.94s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:06<00:04,  2.06s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:06<00:04,  2.05s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:08<00:02,  2.00s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:09<00:00,  1.63s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:09<00:00,  1.80s/it]
+[32m2026-04-26 12:14:54.406[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m100[0m - [1mNo metadata found in task config for VisualPuzzles_cot, using default n_shot=0[0m
+[32m2026-04-26 12:14:54.407[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m470[0m - [1mBuilding contexts for VisualPuzzles_cot on rank 1...[0m
+  0%|          | 0/8 [00:00<?, ?it/s]100%|██████████| 8/8 [00:00<00:00, 7690.68it/s]
+Loading checkpoint shards:  80%|████████  | 4/5 [00:07<00:01,  1.99s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:08<00:00,  1.62s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:08<00:00,  1.79s/it]
+Rank 0:  Model Class: LlavaLladaForMaskedDiffusion
+[32m2026-04-26 12:14:55.527[0m | [1mINFO    [0m | [36mlmms_eval.evaluator_utils[0m:[36mfrom_taskdict[0m:[36m100[0m - [1mNo metadata found in task config for VisualPuzzles_cot, using default n_shot=0[0m
+[32m2026-04-26 12:14:55.528[0m | [1mINFO    [0m | [36mlmms_eval.api.task[0m:[36mbuild_all_requests[0m:[36m470[0m - [1mBuilding contexts for VisualPuzzles_cot on rank 0...[0m
+  0%|          | 0/8 [00:00<?, ?it/s]100%|██████████| 8/8 [00:00<00:00, 6996.34it/s]
+[32m2026-04-26 12:14:56.469[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m657[0m - [1mRunning generate_until requests[0m
+[32m2026-04-26 12:14:56.469[0m | [1mINFO    [0m | [36mlmms_eval.evaluator[0m:[36mevaluate[0m:[36m657[0m - [1mRunning generate_until requests[0m
+Model Responding:   0%|          | 0/1 [00:00<?, ?it/s]Preprocess:Image Aspect Ratio anyres
+(768, 384)
+(768, 768)
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+(768, 768)
+(1152, 384)
+(768, 768)
+(768, 384)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 384)
+(768, 384)
+(768, 768)
+(1152, 384)
+(768, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Preprocess:Image Aspect Ratio anyres
+(768, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+(768, 768)
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+(768, 768)
+(1152, 384)
+(768, 768)
+(768, 384)
+(768, 384)
+(768, 768)
+(768, 384)
+(768, 768)
+(1152, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+(768, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Preprocess:Image Aspect Ratio anyres
+(768, 384)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+(768, 384)
+(768, 384)
+(1152, 384)
+(1152, 384)
+(768, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+(768, 768)
+(768, 768)
+(768, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+num_transfer_tokens torch.Size([8, 4096])
+
+Region editing 8 images:   0%|          | 0/64 [00:00<?, ?it/s][Anum_transfer_tokens torch.Size([8, 4096])
+Region editing 8 images:   0%|          | 0/64 [00:00<?, ?it/s]
+Region editing 8 images:   2%|▏         | 1/64 [00:00<01:00,  1.04it/s][ARegion editing 8 images:   2%|▏         | 1/64 [00:00<00:54,  1.15it/s]Region editing 8 images:   3%|▎         | 2/64 [00:01<00:52,  1.17it/s]
+Region editing 8 images:   3%|▎         | 2/64 [00:01<00:58,  1.06it/s][ARegion editing 8 images:   5%|▍         | 3/64 [00:02<00:51,  1.18it/s]
+Region editing 8 images:   5%|▍         | 3/64 [00:02<00:57,  1.06it/s][ARegion editing 8 images:   6%|▋         | 4/64 [00:03<00:50,  1.18it/s]
+Region editing 8 images:   6%|▋         | 4/64 [00:03<00:56,  1.06it/s][ARegion editing 8 images:   8%|▊         | 5/64 [00:04<00:49,  1.19it/s]
+Region editing 8 images:   8%|▊         | 5/64 [00:04<00:55,  1.07it/s][ARegion editing 8 images:   9%|▉         | 6/64 [00:05<00:48,  1.19it/s]
+Region editing 8 images:   9%|▉         | 6/64 [00:05<00:54,  1.07it/s][ARegion editing 8 images:  11%|█         | 7/64 [00:05<00:47,  1.19it/s]
+Region editing 8 images:  11%|█         | 7/64 [00:06<00:53,  1.07it/s][ARegion editing 8 images:  12%|█▎        | 8/64 [00:06<00:47,  1.19it/s]
+Region editing 8 images:  12%|█▎        | 8/64 [00:07<00:52,  1.07it/s][ARegion editing 8 images:  14%|█▍        | 9/64 [00:07<00:46,  1.19it/s]
+Region editing 8 images:  14%|█▍        | 9/64 [00:08<00:51,  1.07it/s][ARegion editing 8 images:  16%|█▌        | 10/64 [00:08<00:45,  1.19it/s]
+Region editing 8 images:  16%|█▌        | 10/64 [00:09<00:50,  1.07it/s][ARegion editing 8 images:  17%|█▋        | 11/64 [00:09<00:44,  1.19it/s]Region editing 8 images:  19%|█▉        | 12/64 [00:10<00:43,  1.19it/s]
+Region editing 8 images:  17%|█▋        | 11/64 [00:10<00:49,  1.07it/s][ARegion editing 8 images:  20%|██        | 13/64 [00:10<00:42,  1.19it/s]
+Region editing 8 images:  19%|█▉        | 12/64 [00:11<00:48,  1.07it/s][ARegion editing 8 images:  22%|██▏       | 14/64 [00:11<00:42,  1.19it/s]
+Region editing 8 images:  20%|██        | 13/64 [00:12<00:47,  1.07it/s][ARegion editing 8 images:  23%|██▎       | 15/64 [00:12<00:41,  1.19it/s]
+Region editing 8 images:  22%|██▏       | 14/64 [00:13<00:46,  1.07it/s][ARegion editing 8 images:  25%|██▌       | 16/64 [00:13<00:40,  1.19it/s]
+Region editing 8 images:  23%|██▎       | 15/64 [00:14<00:45,  1.07it/s][ARegion editing 8 images:  27%|██▋       | 17/64 [00:14<00:39,  1.19it/s]
+Region editing 8 images:  25%|██▌       | 16/64 [00:15<00:44,  1.07it/s][ARegion editing 8 images:  28%|██▊       | 18/64 [00:15<00:38,  1.19it/s]
+Region editing 8 images:  27%|██▋       | 17/64 [00:15<00:44,  1.07it/s][ARegion editing 8 images:  30%|██▉       | 19/64 [00:16<00:37,  1.19it/s]
+Region editing 8 images:  28%|██▊       | 18/64 [00:16<00:43,  1.07it/s][ARegion editing 8 images:  31%|███▏      | 20/64 [00:16<00:37,  1.19it/s]
+Region editing 8 images:  30%|██▉       | 19/64 [00:17<00:42,  1.07it/s][ARegion editing 8 images:  33%|███▎      | 21/64 [00:17<00:36,  1.19it/s]Region editing 8 images:  34%|███▍      | 22/64 [00:18<00:35,  1.19it/s]
+Region editing 8 images:  31%|███▏      | 20/64 [00:18<00:41,  1.07it/s][ARegion editing 8 images:  36%|███▌      | 23/64 [00:19<00:34,  1.19it/s]
+Region editing 8 images:  33%|███▎      | 21/64 [00:19<00:40,  1.07it/s][ARegion editing 8 images:  38%|███▊      | 24/64 [00:20<00:33,  1.19it/s]
+Region editing 8 images:  34%|███▍      | 22/64 [00:20<00:39,  1.07it/s][ARegion editing 8 images:  39%|███▉      | 25/64 [00:21<00:32,  1.19it/s]
+Region editing 8 images:  36%|███▌      | 23/64 [00:21<00:38,  1.07it/s][ARegion editing 8 images:  41%|████      | 26/64 [00:21<00:32,  1.19it/s]
+Region editing 8 images:  38%|███▊      | 24/64 [00:22<00:37,  1.07it/s][ARegion editing 8 images:  42%|████▏     | 27/64 [00:22<00:31,  1.19it/s]
+Region editing 8 images:  39%|███▉      | 25/64 [00:23<00:36,  1.07it/s][ARegion editing 8 images:  44%|████▍     | 28/64 [00:23<00:30,  1.19it/s]
+Region editing 8 images:  41%|████      | 26/64 [00:24<00:35,  1.07it/s][ARegion editing 8 images:  45%|████▌     | 29/64 [00:24<00:29,  1.19it/s]
+Region editing 8 images:  42%|████▏     | 27/64 [00:25<00:34,  1.07it/s][ARegion editing 8 images:  47%|████▋     | 30/64 [00:25<00:28,  1.19it/s]
+Region editing 8 images:  44%|████▍     | 28/64 [00:26<00:33,  1.07it/s][ARegion editing 8 images:  48%|████▊     | 31/64 [00:26<00:27,  1.19it/s]Region editing 8 images:  50%|█████     | 32/64 [00:26<00:26,  1.19it/s]
+Region editing 8 images:  45%|████▌     | 29/64 [00:27<00:32,  1.07it/s][ARegion editing 8 images:  52%|█████▏    | 33/64 [00:27<00:26,  1.19it/s]
+Region editing 8 images:  47%|████▋     | 30/64 [00:28<00:31,  1.07it/s][ARegion editing 8 images:  53%|█████▎    | 34/64 [00:28<00:25,  1.19it/s]
+Region editing 8 images:  48%|████▊     | 31/64 [00:29<00:30,  1.07it/s][ARegion editing 8 images:  55%|█████▍    | 35/64 [00:29<00:24,  1.19it/s]
+Region editing 8 images:  50%|█████     | 32/64 [00:30<00:30,  1.07it/s][ARegion editing 8 images:  56%|█████▋    | 36/64 [00:30<00:23,  1.19it/s]
+Region editing 8 images:  52%|█████▏    | 33/64 [00:30<00:29,  1.07it/s][ARegion editing 8 images:  58%|█████▊    | 37/64 [00:31<00:22,  1.19it/s]
+Region editing 8 images:  53%|█████▎    | 34/64 [00:31<00:28,  1.07it/s][ARegion editing 8 images:  59%|█████▉    | 38/64 [00:32<00:21,  1.19it/s]
+Region editing 8 images:  55%|█████▍    | 35/64 [00:32<00:27,  1.07it/s][ARegion editing 8 images:  61%|██████    | 39/64 [00:32<00:21,  1.19it/s]
+Region editing 8 images:  56%|█████▋    | 36/64 [00:33<00:26,  1.07it/s][ARegion editing 8 images:  62%|██████▎   | 40/64 [00:33<00:20,  1.19it/s]
+Region editing 8 images:  58%|█████▊    | 37/64 [00:34<00:25,  1.06it/s][ARegion editing 8 images:  64%|██████▍   | 41/64 [00:34<00:19,  1.19it/s]Region editing 8 images:  66%|██████▌   | 42/64 [00:35<00:18,  1.19it/s]
+Region editing 8 images:  59%|█████▉    | 38/64 [00:35<00:24,  1.06it/s][ARegion editing 8 images:  67%|██████▋   | 43/64 [00:36<00:17,  1.19it/s]
+Region editing 8 images:  61%|██████    | 39/64 [00:36<00:23,  1.06it/s][ARegion editing 8 images:  69%|██████▉   | 44/64 [00:37<00:16,  1.19it/s]
+Region editing 8 images:  62%|██████▎   | 40/64 [00:37<00:22,  1.06it/s][ARegion editing 8 images:  70%|███████   | 45/64 [00:37<00:16,  1.19it/s]
+Region editing 8 images:  64%|██████▍   | 41/64 [00:38<00:22,  1.04it/s][ARegion editing 8 images:  72%|███████▏  | 46/64 [00:38<00:15,  1.19it/s]
+Region editing 8 images:  66%|██████▌   | 42/64 [00:39<00:21,  1.00it/s][ARegion editing 8 images:  73%|███████▎  | 47/64 [00:39<00:14,  1.19it/s]
+Region editing 8 images:  67%|██████▋   | 43/64 [00:40<00:20,  1.01it/s][ARegion editing 8 images:  75%|███████▌  | 48/64 [00:40<00:13,  1.19it/s]Region editing 8 images:  77%|███████▋  | 49/64 [00:41<00:12,  1.19it/s]
+Region editing 8 images:  69%|██████▉   | 44/64 [00:41<00:19,  1.02it/s][ARegion editing 8 images:  78%|███████▊  | 50/64 [00:42<00:11,  1.19it/s]
+Region editing 8 images:  70%|███████   | 45/64 [00:42<00:18,  1.04it/s][ARegion editing 8 images:  80%|███████▉  | 51/64 [00:42<00:10,  1.19it/s]
+Region editing 8 images:  72%|███████▏  | 46/64 [00:43<00:17,  1.05it/s][ARegion editing 8 images:  81%|████████▏ | 52/64 [00:43<00:10,  1.19it/s]
+Region editing 8 images:  73%|███████▎  | 47/64 [00:44<00:16,  1.05it/s][ARegion editing 8 images:  83%|████████▎ | 53/64 [00:44<00:09,  1.19it/s]
+Region editing 8 images:  75%|███████▌  | 48/64 [00:45<00:15,  1.06it/s][ARegion editing 8 images:  84%|████████▍ | 54/64 [00:45<00:08,  1.19it/s]
+Region editing 8 images:  77%|███████▋  | 49/64 [00:46<00:14,  1.06it/s][ARegion editing 8 images:  86%|████████▌ | 55/64 [00:46<00:07,  1.19it/s]
+Region editing 8 images:  78%|███████▊  | 50/64 [00:47<00:13,  1.06it/s][ARegion editing 8 images:  88%|████████▊ | 56/64 [00:47<00:06,  1.19it/s]
+Region editing 8 images:  80%|███████▉  | 51/64 [00:48<00:12,  1.06it/s][ARegion editing 8 images:  89%|████████▉ | 57/64 [00:48<00:05,  1.19it/s]Region editing 8 images:  91%|█████████ | 58/64 [00:48<00:05,  1.19it/s]
+Region editing 8 images:  81%|████████▏ | 52/64 [00:49<00:14,  1.18s/it][ARegion editing 8 images:  92%|█████████▏| 59/64 [00:49<00:04,  1.19it/s]Region editing 8 images:  94%|█████████▍| 60/64 [00:50<00:03,  1.19it/s]Region editing 8 images:  95%|█████████▌| 61/64 [00:51<00:02,  1.19it/s]
+Region editing 8 images:  83%|████████▎ | 53/64 [00:51<00:14,  1.35s/it][ARegion editing 8 images:  97%|█████████▋| 62/64 [00:52<00:01,  1.19it/s]
+Region editing 8 images:  84%|████████▍ | 54/64 [00:52<00:13,  1.30s/it][ARegion editing 8 images:  98%|█████████▊| 63/64 [00:53<00:00,  1.19it/s]
+Region editing 8 images:  86%|████████▌ | 55/64 [00:53<00:10,  1.19s/it][ARegion editing 8 images: 100%|██████████| 64/64 [00:53<00:00,  1.19it/s]Region editing 8 images: 100%|██████████| 64/64 [00:53<00:00,  1.19it/s]
+Preprocess:Image Aspect Ratio anyres
+(768, 768)
+(768, 768)
+
+Region editing 8 images:  88%|████████▊ | 56/64 [00:54<00:08,  1.12s/it][A(1152, 384)
+(768, 768)
+(768, 384)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 384)
+(768, 768)
+(768, 768)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+
+Region editing 8 images:  89%|████████▉ | 57/64 [00:55<00:07,  1.06s/it][A
+Region editing 8 images:  91%|█████████ | 58/64 [00:56<00:06,  1.03s/it][A
+Region editing 8 images:  92%|█████████▏| 59/64 [00:57<00:04,  1.00it/s][A
+Region editing 8 images:  94%|█████████▍| 60/64 [00:58<00:03,  1.02it/s][A
+Region editing 8 images:  95%|█████████▌| 61/64 [00:59<00:02,  1.03it/s][A
+Region editing 8 images:  97%|█████████▋| 62/64 [01:00<00:01,  1.04it/s][A
+Region editing 8 images:  98%|█████████▊| 63/64 [01:01<00:00,  1.05it/s][A
+Region editing 8 images: 100%|██████████| 64/64 [01:02<00:00,  1.05it/s][ARegion editing 8 images: 100%|██████████| 64/64 [01:02<00:00,  1.03it/s]
+Preprocess:Image Aspect Ratio anyres
+(768, 384)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 768)
+(768, 384)
+(768, 768)
+(768, 384)
+(768, 768)
+(1152, 384)
+(768, 768)
+DEBUG_PRINT_IMAGE_RES: ('anyres', 'spatial_unpad', 'grid')
+Avg Latency (of 8): 405.02788069844246
+Avg Latency (of 8): 419.7831235229969
+Model Responding: 100%|██████████| 1/1 [55:59<00:00, 3359.76s/it]Model Responding: 100%|██████████| 1/1 [55:59<00:00, 3359.76s/it]
+Postprocessing:   0%|          | 0/8 [00:00<?, ?it/s]Postprocessing: 100%|██████████| 8/8 [00:00<00:00, 10109.80it/s]
+wandb: updating run metadata
+wandb: uploading config.yaml; uploading output.log; uploading wandb-summary.json
+wandb: uploading summary, console lines 169-169
+wandb: 🚀 View run debug at: https://wandb.ai/jeoni/lmms-eval/runs/08gr733j
+wandb: ⭐️ View project at: https://wandb.ai/jeoni/lmms-eval
+wandb: Synced 7 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260426_121434-08gr733j/logs
+[rank0]:[W426 13:10:59.257167698 ProcessGroupNCCL.cpp:1479] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Done evaluating checkpoint: /scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50
+Results saved to: tmp/image_gen_usebboxFalse_default/thinkmorph_interleave-Unified-LavidaO-checkpoint-50
