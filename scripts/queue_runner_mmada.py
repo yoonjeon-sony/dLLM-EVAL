@@ -1,33 +1,44 @@
 #!/usr/bin/env python3
-"""Orchestrator: queues every (ckpt × task) cell, dispatches one GPU per cell,
-monitors via tqdm log parsing, posts to Slack on state changes, and rescore +
-reports after each completion. Crash-safe: all state lives in a JSON lock file
-guarded by fcntl.flock.
+"""MMaDA orchestrator — parallel of scripts/queue_runner.py for the mmada model.
+
+Mirrors `run_mmada.sh`'s invocation:
+
+  python -m lmms_eval --model mmada \
+    --model_args pretrained=$CKPT,gen_img_dir=…,chat_mode=image_gen \
+    --tasks <task> --gen_kwargs prefix_lm=True --log_samples \
+    --log_samples_suffix mmada --output_path …
+
+Writes to a separate lock file (`scheduled_tasks_mmada.lock`) and per-cell log
+dir (`_queue_logs_mmada/`) so it can run concurrently with the llava_llada
+orchestrator (different GPU pool — set CUDA_VISIBLE_DEVICES at launch to carve
+the GPUs between the two queues).
 
 Usage
 -----
-  # Normal run (uses Slack webhook, all GPUs, full queue)
-  python scripts/queue_runner.py
-
-  # Dry run — build lock from existing jsonls, write report, no launches
-  DRY_RUN=1 python scripts/queue_runner.py
-
-  # Subset filters (comma-separated)
-  QUEUE_FILTER_TASKS=blink_jigsaw QUEUE_FILTER_CKPTS=Unified-cp50 \
-      python scripts/queue_runner.py
-
-  # Mute Slack
-  SLACK_MUTE=1 python scripts/queue_runner.py
+  python scripts/queue_runner_mmada.py
+  DRY_RUN=1 python scripts/queue_runner_mmada.py
+  QUEUE_FILTER_TASKS=blink_jigsaw QUEUE_FILTER_CKPTS=MMaDA-PM \
+      python scripts/queue_runner_mmada.py
+  CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/queue_runner_mmada.py   # half the GPUs
 """
 from __future__ import annotations
 
 import os
 import shlex
-import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+# Set lock + log dir BEFORE importing queue_lib (it reads these at import time).
+os.environ.setdefault(
+    "QUEUE_LOCK_PATH",
+    "/scratch2/yoonjeon.kim/.claude/scheduled_tasks_mmada.lock",
+)
+os.environ.setdefault(
+    "QUEUE_LOG_DIR",
+    "/scratch2/yoonjeon.kim/outputs/_queue_logs_mmada",
+)
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
@@ -38,43 +49,37 @@ import rescore_all                            # noqa: E402
 # ──────────────────────────── configuration ────────────────────────────
 
 CKPTS = [
-    # (label, full path or HF repo)
-    ("Unified-cp50",          "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50"),
-    ("region-edit-cp50",      "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-region-edit-LavidaO/checkpoint-50"),
-    ("answer-LavidaO-ckpt50", "yjyjyj98/thinkmorph_answer-LavidaO-ckpt50"),
-    ("edit-LavidaO-ckpt50",   "yjyjyj98/thinkmorph_edit-LavidaO-ckpt50"),
-    ("interleave-cp50",       "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-LavidaO/checkpoint-50"),
+    # (label, path or HF repo)
+    ("MMaDA-PM",                 "tyfeld/MMaDA-Parallel-M"),
+    ("sft-PM-zebracot",          "yjyjyj98/sft_MMaDA-PM-thinkmorph_zebracot-ckpt8000"),
+    ("answer-MMaDA-ckpt50",      "yjyjyj98/thinkmorph_answer-MMaDA-ckpt50"),
+    ("edit-MMaDA-ckpt50",        "yjyjyj98/thinkmorph_edit-MMaDA-ckpt50"),
+    ("Unified-MMaDA-cp50",       "/scratch2/yoonjeon.kim/rl-mmadaMixCoT-thinkmorph/thinkmorph_interleave-Unified-MMaDA-MixCoT/checkpoint-50"),
 ]
 
 TASKS = [
     "mmvet", "mmstar", "mmmu_val", "vstar_bench", "cv_bench_reasoning",
     "chartqa", "blink_jigsaw",
-    # VisualPuzzles_cot removed at user's request 2026-04-26 — too long-running
-    # for the current queue, and an aborted run is preferable to wasting
-    # compute on it.
 ]
 
-# Per-task TEXT_BATCH_BUDGET overrides. mmmu_val OOM'd with the global default
-# of 2**15 / max_new_tokens — halve the budget for that task so each text batch
-# is smaller and fits in 143 GB H200 memory.
+# Per-task TEXT_BATCH_BUDGET overrides (same rationale as the llava_llada
+# orchestrator — mmmu_val tends to OOM at the global default).
 TASK_TEXT_BATCH_BUDGET = {
-    "mmmu_val": 2 ** 12,   # 4096 tokens of budget → text_batch_size = 4 at max_new_tokens=1024
-                           # (lowered from 2**14 / batch=16 after repeated OOMs on H200/143GB:
-                           # image-gen phase alone uses ~87 GB, leaving ~55 GB for text-gen;
-                           # batch=16 needed ~70 GB for text and OOM'd at batch 14/29)
+    "mmmu_val": 2 ** 14,
 }
 
-BASE_OUT      = Path("/scratch2/yoonjeon.kim/outputs")
-DEFAULT_ROOT  = BASE_OUT / "image_gen_usebboxFalse_default"
-LOG_DIR       = ql.LOG_DIR
-TMP_DIR       = Path("/tmp/queue_runner")
-SUMMARY_EVERY = int(os.environ.get("QUEUE_SUMMARY_EVERY_S", 1800))   # 30 min
+CHAT_MODE   = os.environ.get("CHAT_MODE", "image_gen")
+USE_BBOX    = os.environ.get("USE_BBOX", "False")          # parity with run_mmada.sh
+BASE_OUT    = Path(os.environ.get("BASE_OUT", "/scratch2/yoonjeon.kim/outputs"))
+DEFAULT_ROOT = BASE_OUT / f"mmada_{CHAT_MODE}_usebbox{USE_BBOX}"
+LOG_DIR     = ql.LOG_DIR
+TMP_DIR     = Path("/tmp/queue_runner_mmada")
+SUMMARY_EVERY = int(os.environ.get("QUEUE_SUMMARY_EVERY_S", 1800))
 TICK_S        = int(os.environ.get("QUEUE_TICK_S", 15))
 DRY_RUN       = os.environ.get("DRY_RUN", "").lower() in ("1", "true")
 SLACK_MUTE    = os.environ.get("SLACK_MUTE", "").lower() in ("1", "true")
 TEXT_BUDGET   = os.environ.get("TEXT_BATCH_BUDGET", "32768")
 
-# Optional subset filters
 FILTER_TASKS  = set(filter(None, os.environ.get("QUEUE_FILTER_TASKS", "").split(",")))
 FILTER_CKPTS  = set(filter(None, os.environ.get("QUEUE_FILTER_CKPTS", "").split(",")))
 
@@ -84,7 +89,7 @@ LMMS_EVAL_BIN = ["python", "-u", "-m", "lmms_eval"]
 # ──────────────────────────── cell construction ────────────────────────────
 
 def ckpt_dirname(ckpt_path: str) -> str:
-    """Mirror MODEL_NAME from run_lmms-eval.sh: basename(dirname)-basename."""
+    """Mirror MODEL_NAME from run_mmada.sh: basename(dirname)-basename."""
     p = ckpt_path.rstrip("/")
     parent = os.path.basename(os.path.dirname(p))
     leaf   = os.path.basename(p)
@@ -96,7 +101,6 @@ def jsonl_path_for(ckpt_path: str, task: str) -> Path:
 
 
 def cell_filtered(c: dict) -> bool:
-    """True iff this cell is excluded by FILTER_* env vars (filters only narrow dispatch)."""
     if FILTER_CKPTS and c["ckpt_label"] not in FILTER_CKPTS:
         return True
     if FILTER_TASKS and c["task"] not in FILTER_TASKS:
@@ -151,7 +155,6 @@ def mark_already_done(cells: list[dict]) -> int:
 
 
 def merge_cells(existing: list[dict], target: list[dict]) -> list[dict]:
-    """Keep state for cells already in lock; add new cells from target."""
     by_id = {c["id"]: c for c in existing}
     out = []
     for t in target:
@@ -165,45 +168,37 @@ def merge_cells(existing: list[dict], target: list[dict]) -> list[dict]:
 # ──────────────────────────── launch / monitor ────────────────────────────
 
 def build_command(cell: dict, gpu: int) -> tuple[list[str], dict, Path]:
-    """Return (argv, env, log_path) for the lmms-eval invocation."""
     job_dir = TMP_DIR / cell["id"]
     job_dir.mkdir(parents=True, exist_ok=True)
 
     out_dir = DEFAULT_ROOT / ckpt_dirname(cell["ckpt_path"])
     gen_img = out_dir / "gen_imgs"
 
+    # Mirror run_mmada.sh's --model_args: pretrained, gen_img_dir, chat_mode.
+    # No conv_template / use_bbox — those are llava_llada-only.
     model_args = (
         f"pretrained={cell['ckpt_path']},"
-        f"conv_template=llada,"
-        f"model_name=llava_llada,"
-        f"chat_mode=image_gen,"
-        f"use_bbox=False,"
-        f"gen_img_dir={gen_img}"
+        f"gen_img_dir={gen_img},"
+        f"chat_mode={CHAT_MODE}"
     )
 
     argv = LMMS_EVAL_BIN + [
-        "--model", "llava_llada",
+        "--model", "mmada",
         "--model_args", model_args,
         "--tasks", cell["task"],
         "--gen_kwargs", "prefix_lm=True",
         "--log_samples",
-        "--log_samples_suffix", "llava_llada",
+        "--log_samples_suffix", "mmada",
         "--output_path", str(out_dir),
-        "--wandb_args", f"project=lmms-eval,job_type=eval,name=queue_{cell['id']}",
+        "--wandb_args", f"project=lmms-eval,job_type=eval,name=mmada_queue_{cell['id']}",
     ]
 
-    # blink_jigsaw's pre_prompt is now baked into the in-tree
-    # `lmms-eval/lmms_eval/tasks/blink/_default_template_yaml`, so no overlay
-    # yaml is needed any more.
-
     env = os.environ.copy()
-    # Mirror run_lmms-eval.sh's NUM_GPUS=1 branch: unset distributed env vars so
-    # accelerate runs in single-process mode without torch.distributed rendezvous.
+    # Single-process mode: unset distributed env vars so accelerate doesn't try
+    # to init torch.distributed.
     for k in ("RANK", "WORLD_SIZE", "LOCAL_RANK", "LOCAL_WORLD_SIZE",
               "NODE_RANK", "MASTER_ADDR", "MASTER_PORT"):
         env.pop(k, None)
-    # Per-task budget override wins over the global TEXT_BATCH_BUDGET so
-    # OOM-prone tasks (e.g. mmmu_val) get smaller text batches.
     budget = TASK_TEXT_BATCH_BUDGET.get(cell["task"], int(TEXT_BUDGET))
     env.update({
         "CUDA_VISIBLE_DEVICES":   str(gpu),
@@ -221,10 +216,10 @@ def build_command(cell: dict, gpu: int) -> tuple[list[str], dict, Path]:
 
 def launch(cell: dict, gpu: int) -> None:
     argv, env, log_path = build_command(cell, gpu)
-    print(f"[launch] {cell['id']} on GPU {gpu} → {log_path}")
-    print("         " + " ".join(shlex.quote(x) for x in argv))
+    print(f"[mmada-launch] {cell['id']} on GPU {gpu} → {log_path}")
+    print("              " + " ".join(shlex.quote(x) for x in argv))
     fh = log_path.open("ab")
-    fh.write(f"\n=== queue_runner launch at {ql.utc_now()} | gpu={gpu} | scale={cell['text_batch_scale']} ===\n".encode())
+    fh.write(f"\n=== queue_runner_mmada launch at {ql.utc_now()} | gpu={gpu} | scale={cell['text_batch_scale']} ===\n".encode())
     fh.flush()
     proc = subprocess.Popen(
         argv, env=env, stdout=fh, stderr=fh,
@@ -236,7 +231,7 @@ def launch(cell: dict, gpu: int) -> None:
     cell["started_at"] = ql.utc_now()
     cell["log_path"]   = str(log_path)
     ql.slack_post(
-        f"▶ `{cell['ckpt_label']}` · `{cell['task']}` on GPU {gpu} (pid {proc.pid}) — log `{log_path.name}`, scale={cell['text_batch_scale']}",
+        f"▶ [mmada] `{cell['ckpt_label']}` · `{cell['task']}` on GPU {gpu} (pid {proc.pid}) — log `{log_path.name}`, scale={cell['text_batch_scale']}",
         mute=SLACK_MUTE,
     )
 
@@ -252,9 +247,6 @@ def update_progress(cell: dict) -> None:
 
 
 def _safe_release(cell: dict, pool: ql.GPUPool, all_cells: list[dict]) -> None:
-    """Release a GPU back to the pool only if no OTHER running cell is still
-    holding it. Prevents double-allocation when one cell's finalize races with
-    another cell's launch on the same GPU id."""
     gpu = cell.get("gpu_id")
     if gpu is None:
         return
@@ -263,14 +255,11 @@ def _safe_release(cell: dict, pool: ql.GPUPool, all_cells: list[dict]) -> None:
         if c is not cell and c.get("status") == "running" and c.get("gpu_id") == gpu
     ]
     if others:
-        # Some other cell is using this GPU now; don't put it back in the free pool.
         return
     pool.release(gpu)
 
 
 def finalize(cell: dict, pool: ql.GPUPool, all_cells: list[dict] | None = None) -> bool:
-    """Process exited; classify result. Returns True if cell terminal.
-    Pass `all_cells` so the GPU release can check for other current owners."""
     if all_cells is None:
         all_cells = [cell]
     log_path = Path(cell["log_path"]) if cell["log_path"] else None
@@ -284,7 +273,7 @@ def finalize(cell: dict, pool: ql.GPUPool, all_cells: list[dict] | None = None) 
             cell["robust_score"] = stats["robust_acc"]
             cell["n_records"]    = stats["n"]
         ql.slack_post(
-            f"✅ `{cell['ckpt_label']}` · `{cell['task']}` — N={stats['n'] if stats else '?'}, "
+            f"✅ [mmada] `{cell['ckpt_label']}` · `{cell['task']}` — N={stats['n'] if stats else '?'}, "
             f"robust acc={(cell['robust_score'] or 0)*100:.2f}%",
             mute=SLACK_MUTE,
         )
@@ -303,20 +292,20 @@ def finalize(cell: dict, pool: ql.GPUPool, all_cells: list[dict] | None = None) 
             cell["ended_at"]         = None
             cell["error_excerpt"]    = "OOM — auto-retry"
             ql.slack_post(
-                f"♻ `{cell['ckpt_label']}` · `{cell['task']}` OOM, retry "
+                f"♻ [mmada] `{cell['ckpt_label']}` · `{cell['task']}` OOM, retry "
                 f"{cell['retries']}/{cell['max_retries']} with TEXT_BATCH_SCALE={cell['text_batch_scale']}",
                 mute=SLACK_MUTE,
             )
             _safe_release(cell, pool, all_cells)
             cell["gpu_id"] = None
-            return False     # not terminal — back to pending
+            return False
         cell["status"] = "error_oom"
     else:
         cell["status"] = "error_other"
 
     cell["error_excerpt"] = excerpt[-3000:]
     ql.slack_post(
-        f"❌ `{cell['ckpt_label']}` · `{cell['task']}` failed ({cell['status']})\n"
+        f"❌ [mmada] `{cell['ckpt_label']}` · `{cell['task']}` failed ({cell['status']})\n"
         f"```\n{excerpt[-1500:]}\n```",
         mute=SLACK_MUTE,
     )
@@ -326,14 +315,7 @@ def finalize(cell: dict, pool: ql.GPUPool, all_cells: list[dict] | None = None) 
 
 # ──────────────────────────── report writing ────────────────────────────
 
-STATUS_GLYPH = {
-    "pending":     "⏳",
-    "running":     "🏃",
-    "done":        "✅",
-    "error_oom":   "♻❌",
-    "error_other": "❌",
-    "skipped":     "·",
-}
+REPORT_PATH = REPO / "report_all_tasks_mmada.md"
 
 
 def render_top_section(cells: list[dict]) -> str:
@@ -349,12 +331,13 @@ def render_top_section(cells: list[dict]) -> str:
         for c in cells if c["status"] == "running"
     )
 
-    out = ["", "## Queue progress (live)", ""]
+    out = ["# MMaDA queue progress (live)", ""]
     out.append(
         f"Updated {ql.utc_now()}. **{n_done} / {total}** done · "
         f"{n_running} running · {n_pend} pending · {n_err} errored. "
         f"Aggregate running ETA ≈ **{ql.hms(eta_remaining)}**."
     )
+    out.append(f"Output root: `{DEFAULT_ROOT}`")
     out.append("")
     out.append("|             | " + " | ".join(f"`{t}`" for t in TASKS) + " |")
     out.append("|---|" + "|".join([":-:"] * len(TASKS)) + "|")
@@ -384,10 +367,9 @@ def render_top_section(cells: list[dict]) -> str:
     out.append("Legend: ✅ done · 🏃 running (% from tqdm) · ⏳ pending · ♻ retrying · ❌ failed")
     out.append("")
 
-    # Per-job ETA table
     running = [c for c in cells if c["status"] == "running"]
     if running:
-        out.append("### Per-job ETA")
+        out.append("## Per-job ETA")
         out.append("")
         out.append("| ckpt | task | gpu | started | elapsed | tqdm % | remaining (ETA) |")
         out.append("|---|---|---:|---|---:|---:|---:|")
@@ -400,15 +382,15 @@ def render_top_section(cells: list[dict]) -> str:
                 f"{c['started_at'] or '—'} | {elapsed} | {pct} | {remain} |"
             )
         out.append("")
-    out.append("---")
-    out.append("")
     return "\n".join(out)
 
 
 def write_report(cells: list[dict]) -> None:
-    """Rebuild the full report: top section (live matrix + ETA) + body tables."""
-    matrix = rescore_all.build_full_matrix()
-    rescore_all.write_aggregate_report(matrix, prefix_md=render_top_section(cells))
+    """Write a self-contained mmada report with just the live matrix + ETA.
+    Body per-ROOT tables from rescore_all.py are shared with the llava_llada
+    queue (they live in `report_all_tasks.md`); this report is just the mmada
+    queue's live status snapshot."""
+    REPORT_PATH.write_text(render_top_section(cells))
 
 
 # ──────────────────────────── main loop ────────────────────────────
@@ -428,7 +410,7 @@ def maybe_summary(cells: list[dict]) -> None:
     n_err     = sum(1 for c in cells if c["status"].startswith("error"))
     eta = sum((c["tqdm_remaining_s"] or 0) for c in cells if c["status"] == "running")
     ql.slack_post(
-        f"⏳ Queue: {n_done}/{len(cells)} done · {n_running} running · {n_err} errored · ETA ≈ {ql.hms(eta)}",
+        f"⏳ [mmada] Queue: {n_done}/{len(cells)} done · {n_running} running · {n_err} errored · ETA ≈ {ql.hms(eta)}",
     )
 
 
@@ -438,10 +420,11 @@ def main() -> int:
     existing = lock.get("cells", [])
     cells = merge_cells(existing, target_cells)
     skipped = mark_already_done(cells)
-    print(f"[queue] {len(cells)} cells, {skipped} already complete")
+    print(f"[mmada-queue] {len(cells)} cells, {skipped} already complete")
 
     lock = {
         "version":     1,
+        "model":       "mmada",
         "started_at":  lock.get("started_at") or ql.utc_now(),
         "updated_at":  ql.utc_now(),
         "cells":       cells,
@@ -450,39 +433,33 @@ def main() -> int:
     write_report(cells)
 
     if DRY_RUN:
-        print("[queue] DRY_RUN — exiting after lock + report.")
+        print("[mmada-queue] DRY_RUN — exiting after lock + report.")
         return 0
 
     gpus = ql.detect_gpus()
     if not gpus:
-        print("[queue] no GPUs visible. Exiting.")
+        print("[mmada-queue] no GPUs visible. Exiting.")
         return 1
     pool = ql.GPUPool(gpus)
-    # Re-attach pass 1: any cell with a still-alive PID keeps its GPU reserved.
     for c in cells:
         if c["status"] == "running" and ql.pid_alive(c.get("pid")) and c.get("gpu_id") is not None:
             pool.reserve(c["gpu_id"])
-    # Re-attach pass 2: any cell whose PID is dead (orchestrator restart, manual
-    # kill, OOM, crash, etc.) gets finalized BEFORE the dispatch loop. This
-    # prevents a window where pool.release() in the OOM-retry path collides with
-    # an already-allocated GPU.
     for c in cells:
         if c["status"] == "running" and not ql.pid_alive(c.get("pid")):
-            print(f"[queue] startup-finalize dead cell {c['id']} (pid {c.get('pid')})")
+            print(f"[mmada-queue] startup-finalize dead cell {c['id']} (pid {c.get('pid')})")
             finalize(c, pool, cells)
     ql.save_lock(lock)
     write_report(cells)
-    print(f"[queue] GPU pool: {gpus} (free={pool.free}, busy={pool.busy})")
+    print(f"[mmada-queue] GPU pool: {gpus} (free={pool.free}, busy={pool.busy})")
 
     ql.slack_post(
-        f"🚀 queue_runner started on `{ql.host()}` — "
+        f"🚀 [mmada] queue_runner started on `{ql.host()}` — "
         f"{len(cells)} cells, {skipped} already done, GPUs={gpus}",
         mute=SLACK_MUTE,
     )
 
     try:
         while True:
-            # Dispatch (filters narrow which pending cells are picked up)
             for c in cells:
                 if c["status"] != "pending" or cell_filtered(c):
                     continue
@@ -493,7 +470,6 @@ def main() -> int:
                 ql.save_lock(lock)
                 write_report(cells)
 
-            # Monitor
             for c in cells:
                 if c["status"] != "running":
                     continue
@@ -503,12 +479,10 @@ def main() -> int:
                     ql.save_lock(lock)
                     write_report(cells)
 
-            # Heartbeat
             ql.save_lock(lock)
             write_report(cells)
             maybe_summary(cells)
 
-            # Termination — finished if every IN-FILTER cell is terminal
             in_scope = [c for c in cells if not cell_filtered(c)]
             if all(c["status"] in ("done", "error_oom", "error_other", "skipped") for c in in_scope):
                 break
@@ -517,11 +491,11 @@ def main() -> int:
         n_done = sum(1 for c in cells if c["status"] == "done")
         n_err  = sum(1 for c in cells if c["status"].startswith("error"))
         ql.slack_post(
-            f"🏁 queue_runner finished — {n_done}/{len(cells)} done · {n_err} errored",
+            f"🏁 [mmada] queue_runner finished — {n_done}/{len(cells)} done · {n_err} errored",
             mute=SLACK_MUTE,
         )
     except KeyboardInterrupt:
-        ql.slack_post("⚠ queue_runner interrupted (Ctrl-C). Running cells left in place.", mute=SLACK_MUTE)
+        ql.slack_post("⚠ [mmada] queue_runner interrupted (Ctrl-C). Running cells left in place.", mute=SLACK_MUTE)
         raise
     return 0
 

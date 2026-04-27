@@ -1,14 +1,3 @@
-#!/bin/bash
-#SBATCH --partition=dgm
-#SBATCH --account=dgm
-#SBATCH --job-name=lmmseval-mmada
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:2
-#SBATCH --time=24:00:00
-#SBATCH --requeue
-#SBATCH --output=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/output.%j.log
-#SBATCH --error=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/error.%j.log
 
 # Example:
 #   CHAT_MODE=image_gen TASKS="blink_jigsaw,vstar_bench" sbatch run_mmada.sh 0
@@ -19,8 +8,7 @@ shift
 
 declare -a CKPTS=(
   "tyfeld/MMaDA-Parallel-M"
-  # add MMaDA fine-tunes here, e.g.
-  # "/scratch2/yoonjeon.kim/sft_MMaDA-PM-thinkmorph_zebracot/checkpoint-8000"
+  "yjyjyj98/sft_MMaDA-PM-thinkmorph_zebracot-ckpt8000" # tyfeld/MMaDA-Parallel-M
 )
 if [[ -z "${CKPT_INDEX}" ]]; then
     echo "Error: CKPT_INDEX (first positional argument) is required. Valid range: 0-$((${#CKPTS[@]} - 1))" >&2

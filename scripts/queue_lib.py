@@ -196,6 +196,9 @@ def detect_gpus() -> list[int]:
 # ──────────────────────────── misc ────────────────────────────
 
 def pid_alive(pid: int | None) -> bool:
+    """True iff the process exists AND is not a zombie. `os.kill(pid, 0)` alone
+    returns True for zombies (defunct procs whose parent never reaped them),
+    which is too lax — we need the /proc state byte to distinguish."""
     if pid is None:
         return False
     try:
@@ -204,7 +207,17 @@ def pid_alive(pid: int | None) -> bool:
         return False
     except PermissionError:
         return True
-    return True
+    # Process exists; check it's not a zombie via /proc/<pid>/stat field 3.
+    try:
+        with open(f"/proc/{pid}/stat") as fh:
+            stat = fh.read()
+        # Field 3 is the state char; format is "<pid> (<comm>) <state> ..."
+        # comm can contain spaces/parens, so split from the right.
+        state = stat.rsplit(")", 1)[1].strip().split()[0]
+        return state != "Z"
+    except (FileNotFoundError, IndexError):
+        # /proc entry vanished between os.kill and open — treat as dead.
+        return False
 
 
 def tail_lines(path: Path, n: int = 30) -> list[str]:
