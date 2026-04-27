@@ -23,6 +23,7 @@ logger.remove()
 logger.add(sys.stdout, level="WARNING")
 
 AVAILABLE_MODELS = {
+    "anole": "Anole",
     "aria": "Aria",
     "auroracap": "AuroraCap",
     "batch_gpt4": "BatchGPT4",

@@ -1,14 +1,5 @@
 #!/bin/bash
-#SBATCH --partition=dgm
-#SBATCH --account=dgm
-#SBATCH --job-name=lmmseval-mmada
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:2
-#SBATCH --time=24:00:00
-#SBATCH --requeue
-#SBATCH --output=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/output.%j.log
-#SBATCH --error=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/error.%j.log
+set -eo pipefail
 
 # Example:
 #   CHAT_MODE=image_gen TASKS="blink_jigsaw,vstar_bench" sbatch run_mmada.sh 0
@@ -18,9 +9,12 @@ CKPT_INDEX=$1
 shift
 
 declare -a CKPTS=(
-  "tyfeld/MMaDA-Parallel-M"
-  # add MMaDA fine-tunes here, e.g.
-  # "/scratch2/yoonjeon.kim/sft_MMaDA-PM-thinkmorph_zebracot/checkpoint-8000"
+  "tyfeld/MMaDA-Parallel-A"
+  "/scratch2/yoonjeon.kim/sft_mmadaPA-thinkmorph/epoch1-iter999"
+#   "yjyjyj98/sft_MMaDA-PM-thinkmorph_zebracot-ckpt4000" # tyfeld/MMaDA-Parallel-M
+#   "/scratch2/yoonjeon.kim/rl-mmadaMixCoT-thinkmorph/thinkmorph_interleave-Unified-MMaDA-MixCoT/checkpoint-50"
+#   "/scratch2/yoonjeon.kim/rl-mmadaMixCoT-thinkmorph/thinkmorph_answer-MMaDA-MixCoT/checkpoint-50"
+#   yjyjyj98/thinkmorph_edit-MMaDA-ckpt50
 )
 if [[ -z "${CKPT_INDEX}" ]]; then
     echo "Error: CKPT_INDEX (first positional argument) is required. Valid range: 0-$((${#CKPTS[@]} - 1))" >&2
@@ -34,6 +28,8 @@ CKPT="${CKPTS[${CKPT_INDEX}]}"
 LIMIT=${LIMIT:-}
 NUM_GPUS=${NUM_GPUS:-2}
 TASKS=${TASKS:-}
+BATCH_SIZE=${BATCH_SIZE:-}
+RUN_TAG=${RUN_TAG:-}
 
 SAVE_PARITY_CASES=${SAVE_PARITY_CASES:-0}
 PARITY_CASES_ROOT=${PARITY_CASES_ROOT:-DEBUG/parity_text_gen}
@@ -46,7 +42,11 @@ export DEBUG_FIX_PADDING=1
 MODEL_NAME=$(basename "$(dirname "$CKPT")")-$(basename "$CKPT")
 BASE_DIR="${BASE_DIR:-/scratch2/yoonjeon.kim/outputs}"
 
-OUTPUT_DIR="${BASE_DIR}/mmada_${CHAT_MODE}_usebbox${USE_BBOX}/${MODEL_NAME}"
+OUTPUT_SUFFIX=""
+if [[ -n "${RUN_TAG}" ]]; then
+    OUTPUT_SUFFIX="_${RUN_TAG}"
+fi
+OUTPUT_DIR="${BASE_DIR}/mmada_${CHAT_MODE}_usebbox${USE_BBOX}/${MODEL_NAME}${OUTPUT_SUFFIX}"
 
 if [ "${NUM_GPUS}" -eq 1 ]; then
     LAUNCH_CMD="python"
@@ -67,6 +67,10 @@ LIMIT_ARGS=()
 if [[ -n "${LIMIT}" && "${LIMIT,,}" != "none" ]]; then
     LIMIT_ARGS=(--limit "${LIMIT}")
 fi
+BATCH_SIZE_ARGS=()
+if [[ -n "${BATCH_SIZE}" ]]; then
+    BATCH_SIZE_ARGS=(--batch_size "${BATCH_SIZE}")
+fi
 PARITY_ARGS=()
 if [[ "${SAVE_PARITY_CASES}" == "1" || "${SAVE_PARITY_CASES}" == "true" || "${SAVE_PARITY_CASES}" == "True" ]]; then
     PARITY_ARGS=(--save_parity_cases --parity_cases_root "${PARITY_CASES_ROOT}" --parity_cases_max_per_task "${PARITY_CASES_MAX_PER_TASK}")
@@ -82,6 +86,7 @@ ${LAUNCH_CMD} ${LAUNCH_ARGS} \
     --output_path ${OUTPUT_DIR} \
     --wandb_args "project=lmms-eval,job_type=eval,name=${EVAL_RUN:-mmada-debug}" \
     "${LIMIT_ARGS[@]}" \
+    "${BATCH_SIZE_ARGS[@]}" \
     "${PARITY_ARGS[@]}" \
     "$@"
 

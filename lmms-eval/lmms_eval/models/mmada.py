@@ -12,7 +12,6 @@ import numpy as np
 import torch
 from accelerate import Accelerator, DistributedType, InitProcessGroupKwargs
 from accelerate.state import AcceleratorState
-from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -38,6 +37,25 @@ DEBUG_PRINT_OUTPUT = _env_flag("DEBUG_PRINT_OUTPUT")
 LOG_BATCH_TIMING = _env_flag("LOG_BATCH_TIMING", default=True)
 
 
+class _DotDict(dict):
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as e:
+            raise AttributeError(name) from e
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
+def _to_dot(value):
+    if isinstance(value, dict):
+        return _DotDict({k: _to_dot(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [_to_dot(v) for v in value]
+    return value
+
+
 _MMADA_REPO = Path(__file__).resolve().parents[3] / "MMaDA-Parallel-M"
 if str(_MMADA_REPO) not in sys.path:
     sys.path.insert(0, str(_MMADA_REPO))
@@ -51,9 +69,29 @@ from training.utils import image_transform_squash
 _RESOLUTION = 512
 _NUM_VQ_TOKENS = 1024
 _CODEBOOK_SIZE = 8192
-_MAX_TEXT_LEN = 256
+# Length of the input-text slot in the model's training format. Both the
+# t2i_gen prompt template (UniversalPrompting.t2i_gen_prompt) and the
+# interleave training format right-pad the input text to this length, so
+# this is structural — not a generation cap. Output length comes from
+# `gen_kwargs["max_new_tokens"]` (task default) at call time.
+_INPUT_TEXT_LEN = 256
 _MASK_TOKEN_ID = 126336
 _VQ_MODEL_NAME = "showlab/magvitv2"
+
+_RESERVED_TOKENS = {
+    "<|soi|>": 126084,
+    "<|eoi|>": 126085,
+    "<|sov|>": 126086,
+    "<|eov|>": 126087,
+    "<|t2i|>": 126088,
+    "<|mmu|>": 126089,
+    "<|t2v|>": 126090,
+    "<|v2v|>": 126091,
+    "<|lvg|>": 126092,
+    "[iPAD]": 126093,
+    "<|r2i|>": 126094,
+    "<|interleave|>": 126095,
+}
 
 
 @register_model("mmada")
@@ -77,15 +115,18 @@ class Mmada(lmms):
         img_gen_guidance_scale: float = 0.0,
         img_gen_seed_ratio: float = 0.0,
         img_gen_mask_schedule: str = "cosine",
-        text_max_new_tokens: int = _MAX_TEXT_LEN,
-        text_diffusion_steps: Optional[int] = None,
-        text_block_length: Optional[int] = None,
-        text_temperature: float = 0.0,
         text_cfg_scale: float = 0.0,
         text_remasking: str = "low_confidence",
         gen_img_dir: Optional[str] = None,
         chat_mode: Optional[str] = None,
         use_bbox: bool = False,
+        t2i_chunk_size: int = 8,
+        mmu_chunk_size: Optional[int] = None,
+        interleave_chunk_size: int = 8,
+        interleave_text_cfg: float = 2.5,
+        interleave_image_cfg: float = 4.0,
+        interleave_text_steps: int = 128,
+        interleave_image_steps: int = 30,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -103,15 +144,18 @@ class Mmada(lmms):
         self.img_gen_seed_ratio = float(img_gen_seed_ratio)
         self.img_gen_mask_schedule = str(img_gen_mask_schedule)
 
-        self.text_max_new_tokens = int(text_max_new_tokens)
-        self.text_diffusion_steps = int(text_diffusion_steps) if text_diffusion_steps else None
-        self.text_block_length = int(text_block_length) if text_block_length else None
-        self.text_temperature = float(text_temperature)
         self.text_cfg_scale = float(text_cfg_scale)
         self.text_remasking = str(text_remasking)
 
         self.gen_img_dir = gen_img_dir
         self.datetime_str = None
+        self.t2i_chunk_size = max(1, int(t2i_chunk_size))
+        self.mmu_chunk_size = max(1, int(mmu_chunk_size)) if mmu_chunk_size is not None else None
+        self.interleave_chunk_size = max(1, int(interleave_chunk_size))
+        self.interleave_text_cfg = float(interleave_text_cfg)
+        self.interleave_image_cfg = float(interleave_image_cfg)
+        self.interleave_text_steps = int(interleave_text_steps)
+        self.interleave_image_steps = int(interleave_image_steps)
 
         if kwargs:
             eval_logger.warning(f"Unexpected kwargs (ignored): {kwargs}")
@@ -134,7 +178,7 @@ class Mmada(lmms):
         self._tokenizer = AutoTokenizer.from_pretrained(pretrained, padding_side="left")
         self._uni_prompting = UniversalPrompting(
             self._tokenizer,
-            max_text_len=_MAX_TEXT_LEN,
+            max_text_len=_INPUT_TEXT_LEN,
             special_tokens=(
                 "<|soi|>", "<|eoi|>", "<|sov|>", "<|eov|>",
                 "<|t2i|>", "<|mmu|>", "<|t2v|>", "<|v2v|>", "<|lvg|>",
@@ -152,9 +196,9 @@ class Mmada(lmms):
         self._model.eval()
         self._model.requires_grad_(False)
 
-        self._cfg = OmegaConf.create({
+        self._cfg = _to_dot({
             "model": {"mmada": {"num_vq_tokens": _NUM_VQ_TOKENS, "codebook_size": _CODEBOOK_SIZE}},
-            "dataset": {"preprocessing": {"max_seq_length": _MAX_TEXT_LEN, "resolution": self.img_gen_resolution}},
+            "dataset": {"preprocessing": {"max_seq_length": _INPUT_TEXT_LEN, "resolution": self.img_gen_resolution}},
             "training": {
                 "guidance_scale": self.img_gen_guidance_scale,
                 "generation_timesteps": self.img_gen_n_steps,
@@ -193,7 +237,7 @@ class Mmada(lmms):
             self._rank = 0
             self._world_size = 1
 
-        self._max_length = _MAX_TEXT_LEN
+        self._max_length = _INPUT_TEXT_LEN
         self._config = self._model.config
 
     @property
@@ -278,7 +322,112 @@ class Mmada(lmms):
         images = (images * 255.0).permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         return [Image.fromarray(img) for img in images]
 
+    def _interleave_rollout(
+        self, edit_prompts: List[str], batch_pil_images, gen_kwargs: dict
+    ) -> Tuple[List[Image.Image], List[str]]:
+        images: List[Image.Image] = []
+        texts: List[str] = []
+        chunk = self.interleave_chunk_size
+        for i in range(0, len(edit_prompts), chunk):
+            sub_prompts = edit_prompts[i:i + chunk]
+            sub_pils = batch_pil_images[i:i + chunk]
+            sub_imgs, sub_txts = self._interleave_rollout_chunk(sub_prompts, sub_pils, gen_kwargs)
+            images.extend(sub_imgs)
+            texts.extend(sub_txts)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        return images, texts
+
+    def _interleave_rollout_chunk(
+        self, edit_prompts: List[str], batch_pil_images, gen_kwargs: dict
+    ) -> Tuple[List[Image.Image], List[str]]:
+        device = self._device
+        B = len(edit_prompts)
+        tok = self._uni_prompting.text_tokenizer
+
+        pixel_batch = self._pixels_from_pils(batch_pil_images, take_first=True)
+        image_tokens_shifted = self._vq_model.get_code(pixel_batch) + len(tok)
+        uncond_image_tokens = torch.zeros_like(image_tokens_shifted)
+
+        bos = tok.bos_token_id
+        eos = tok.eos_token_id
+
+        cond_lists: List[List[int]] = []
+        uncond_lists: List[List[int]] = []
+        for prompt in edit_prompts:
+            ids = tok(prompt)["input_ids"]
+            ids = list(ids)
+            if not ids or ids[0] != bos:
+                ids = [bos] + ids
+            ids = ids + [eos]
+            cond_lists.append(ids)
+
+            u = list(tok("")["input_ids"])
+            if not u or u[0] != bos:
+                u = [bos] + u
+            u = u + [eos]
+            uncond_lists.append(u)
+
+        max_len = max(len(ids) for ids in cond_lists)
+        for i in range(B):
+            cond_lists[i] = cond_lists[i] + [eos] * (max_len - len(cond_lists[i]))
+            uncond_lists[i] = uncond_lists[i] + [eos] * (max_len - len(uncond_lists[i]))
+
+        text_ids = torch.tensor(cond_lists, dtype=torch.long, device=device)
+        uncond_text_ids = torch.tensor(uncond_lists, dtype=torch.long, device=device)
+
+        interleave_col = torch.full((B, 1), _RESERVED_TOKENS["<|interleave|>"], dtype=torch.long, device=device)
+        soi_col = torch.full((B, 1), _RESERVED_TOKENS["<|soi|>"], dtype=torch.long, device=device)
+        eoi_col = torch.full((B, 1), _RESERVED_TOKENS["<|eoi|>"], dtype=torch.long, device=device)
+
+        input_ids = torch.cat([interleave_col, soi_col, image_tokens_shifted, eoi_col, text_ids], dim=1)
+        uncond_input_ids = torch.cat(
+            [interleave_col, soi_col, uncond_image_tokens, eoi_col, uncond_text_ids], dim=1
+        )
+
+        max_new_tokens = self._max_new_tokens_from_kwargs(gen_kwargs)
+        text_temperature = float(gen_kwargs.get("temperature", 0.0)) if gen_kwargs.get("temperature") is not None else 0.0
+        # interleave_generate reads cfg.dataset.preprocessing.max_seq_length to size
+        # the output text slot, so override it for this call.
+        prev_max_seq = self._cfg.dataset.preprocessing.max_seq_length
+        self._cfg.dataset.preprocessing.max_seq_length = int(max_new_tokens)
+
+        schedule = get_mask_schedule(self.img_gen_mask_schedule)
+        try:
+            with torch.no_grad():
+                output_image_ids, output_text_ids = self.model.interleave_generate(
+                    input_ids,
+                    uncond_input_ids,
+                    text_cfg=self.interleave_text_cfg,
+                    image_cfg=self.interleave_image_cfg,
+                    noise_schedule=schedule,
+                    text_steps=self.interleave_text_steps,
+                    image_steps=self.interleave_image_steps,
+                    text_temperature=text_temperature,
+                    reserved_token_mapping=_RESERVED_TOKENS,
+                    uni_prompting=self._uni_prompting,
+                    config=self._cfg,
+                )
+        finally:
+            self._cfg.dataset.preprocessing.max_seq_length = prev_max_seq
+
+        output_image_ids = torch.clamp(output_image_ids, 0, _CODEBOOK_SIZE - 1).to(torch.long)
+        pil_images = self._decode_vq(output_image_ids)
+        output_texts = tok.batch_decode(output_text_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        return pil_images, output_texts
+
     def _t2i_rollout(self, edit_prompts: List[str], batch_pil_images) -> List[Image.Image]:
+        results: List[Image.Image] = []
+        chunk = self.t2i_chunk_size
+        for i in range(0, len(edit_prompts), chunk):
+            sub_prompts = edit_prompts[i:i + chunk]
+            sub_pils = batch_pil_images[i:i + chunk]
+            results.extend(self._t2i_rollout_chunk(sub_prompts, sub_pils))
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        return results
+
+    def _t2i_rollout_chunk(self, edit_prompts: List[str], batch_pil_images) -> List[Image.Image]:
         device = self._device
         B = len(edit_prompts)
         tok = self._uni_prompting.text_tokenizer
@@ -327,9 +476,42 @@ class Mmada(lmms):
         intermediate_images: List[Image.Image],
         gen_kwargs: dict,
     ) -> List[str]:
+        chunk = self.mmu_chunk_size if self.mmu_chunk_size is not None else len(und_prompts)
+        if chunk >= len(und_prompts):
+            return self._mmu_rollout_chunk(und_prompts, batch_pil_images, intermediate_images, gen_kwargs)
+        results: List[str] = []
+        for i in range(0, len(und_prompts), chunk):
+            sub_prompts = und_prompts[i:i + chunk]
+            sub_pils = batch_pil_images[i:i + chunk]
+            sub_intermediate = intermediate_images[i:i + chunk]
+            results.extend(self._mmu_rollout_chunk(sub_prompts, sub_pils, sub_intermediate, gen_kwargs))
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        return results
+
+    def _mmu_rollout_chunk(
+        self,
+        und_prompts: List[str],
+        batch_pil_images,
+        intermediate_images: List[Image.Image],
+        gen_kwargs: dict,
+    ) -> List[str]:
+        """
+        Build the interleave-format prefix exactly as the model was trained:
+            [<|interleave|>, <|soi|>, in_img, <|eoi|>, in_text_padded, <|soi|>, gen_img, <|eoi|>]
+        Then mmu_generate appends max_new_tokens of MASK tokens (corresponding to the
+        out_text slot in training) and unmasks them via the diffusion loop.
+        Right-pads in_text to a fixed max_text_len with EOS to match training, and
+        skips the broken attention_mask path (interleave training uses no attention
+        mask, padding is fixed-length per sample so batch composition does not change
+        per-doc inputs).
+        """
         device = self._device
         B = len(und_prompts)
         tok = self._uni_prompting.text_tokenizer
+        bos = tok.bos_token_id
+        eos = tok.eos_token_id
+        input_pad_len = _INPUT_TEXT_LEN
 
         in_pix = self._pixels_from_pils(batch_pil_images, take_first=True)
         gen_pix = self._pixels_from_pils(intermediate_images, take_first=False)
@@ -337,55 +519,45 @@ class Mmada(lmms):
         gen_tok = self._vq_model.get_code(gen_pix) + len(tok)
 
         raw_ids_list = tok(und_prompts)["input_ids"]
-        bos = tok.bos_token_id
-        eos = tok.eos_token_id
-        text_ids_list = []
+        text_ids_padded = []
         for ids in raw_ids_list:
             ids = list(ids)
             if not ids or ids[0] != bos:
                 ids = [bos] + ids
-            text_ids_list.append(ids + [eos])
+            if not ids or ids[-1] != eos:
+                ids = ids + [eos]
+            if len(ids) > input_pad_len:
+                ids = ids[:input_pad_len - 1] + [eos]
+            else:
+                ids = ids + [eos] * (input_pad_len - len(ids))
+            text_ids_padded.append(ids)
+        text_batch = torch.tensor(text_ids_padded, dtype=torch.long, device=device)
 
-        max_text = max(len(t) for t in text_ids_list)
-        pad_id = tok.pad_token_id if tok.pad_token_id is not None else eos
-        text_batch = torch.tensor(
-            [[pad_id] * (max_text - len(t)) + t for t in text_ids_list],
-            dtype=torch.long, device=device,
-        )
-
-        mmu = int(self._uni_prompting.sptids_dict["<|mmu|>"])
-        soi = int(self._uni_prompting.sptids_dict["<|soi|>"])
-        eoi = int(self._uni_prompting.sptids_dict["<|eoi|>"])
+        interleave_tok = _RESERVED_TOKENS["<|interleave|>"]
+        soi = _RESERVED_TOKENS["<|soi|>"]
+        eoi = _RESERVED_TOKENS["<|eoi|>"]
         col = lambda v: torch.full((B, 1), v, dtype=torch.long, device=device)
 
         input_ids = torch.cat(
-            [col(mmu), col(soi), in_tok, col(eoi), col(soi), gen_tok, col(eoi), text_batch],
+            [col(interleave_tok), col(soi), in_tok, col(eoi), text_batch, col(soi), gen_tok, col(eoi)],
             dim=1,
         )
-        prefix_len = 1 + (1 + _NUM_VQ_TOKENS + 1) + (1 + _NUM_VQ_TOKENS + 1)
 
-        max_new = int(gen_kwargs.get("max_new_tokens", self.text_max_new_tokens) or self.text_max_new_tokens)
+        max_new = self._max_new_tokens_from_kwargs(gen_kwargs)
+        block_len = max(1, max_new // 4)
         if "block_length" in gen_kwargs and gen_kwargs["block_length"]:
-            block_len = int(gen_kwargs["block_length"])
-        elif self.text_block_length:
-            block_len = self.text_block_length
-        else:
-            block_len = max_new if max_new < 128 else max_new // 2
-        block_len = max(1, block_len)
+            block_len = max(1, int(gen_kwargs["block_length"]))
         num_blocks = max(1, max_new // block_len)
+        steps = max(1, max_new // 2)
         if "step_per_block" in gen_kwargs and gen_kwargs["step_per_block"]:
             steps = int(gen_kwargs["step_per_block"]) * num_blocks
-        elif self.text_diffusion_steps:
-            steps = self.text_diffusion_steps
-        else:
-            steps = max(1, (block_len // 2) * num_blocks)
+        if max_new % block_len != 0:
+            block_len = max(1, max_new // num_blocks)
+            max_new = block_len * num_blocks
+        if steps % num_blocks != 0:
+            steps = max(num_blocks, (steps // num_blocks) * num_blocks)
 
-        attn_mask = torch.cat([
-            torch.ones((B, prefix_len), dtype=torch.long, device=device),
-            (text_batch != pad_id).long(),
-            torch.ones((B, max_new), dtype=torch.long, device=device),
-        ], dim=1)
-
+        text_temperature = float(gen_kwargs.get("temperature", 0.0)) if gen_kwargs.get("temperature") is not None else 0.0
         ctx = torch.autocast("cuda", dtype=torch.bfloat16) if torch.cuda.is_available() else _NullCtx()
         with torch.no_grad(), ctx:
             out = self.model.mmu_generate(
@@ -393,15 +565,24 @@ class Mmada(lmms):
                 max_new_tokens=max_new,
                 steps=steps,
                 block_length=block_len,
-                temperature=self.text_temperature,
+                temperature=text_temperature,
                 cfg_scale=self.text_cfg_scale,
                 remasking=self.text_remasking,
-                attention_mask=attn_mask,
                 mask_id=_MASK_TOKEN_ID,
             )
 
         gen_ids = out[:, input_ids.shape[1]:]
         return tok.batch_decode(gen_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+
+    @staticmethod
+    def _max_new_tokens_from_kwargs(gen_kwargs: dict) -> int:
+        v = gen_kwargs.get("max_new_tokens") if isinstance(gen_kwargs, dict) else None
+        if v is None:
+            raise ValueError(
+                "Mmada requires `max_new_tokens` in the task's generation_kwargs "
+                "(or via --gen_kwargs); none was supplied."
+            )
+        return int(v)
 
     def generate_until(self, requests: List[Instance]) -> List[str]:
         res = []
@@ -434,20 +615,28 @@ class Mmada(lmms):
             ]
 
             edit_prompts = [f"{EDIT_PROMPT} {ctx}" for ctx in batched_contexts]
-            und_prompts = [f"{COT_PROMPT} {ctx}" for ctx in batched_contexts]
+            und_prompts = [f"{ctx}" for ctx in batched_contexts]
 
             t0 = time.time()
-            t_t2i0 = time.time()
-            intermediate_images = self._t2i_rollout(edit_prompts, batch_pil_images)
-            if torch.cuda.is_available():
-                torch.cuda.synchronize(device=self._device)
-            t_t2i1 = time.time()
+            if self.chat_mode == "image_gen":
+                t_t2i0 = time.time()
+                intermediate_images, text_outputs = self._interleave_rollout(edit_prompts, batch_pil_images, gen_kwargs)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize(device=self._device)
+                t_t2i1 = time.time()
+                t_mmu0 = t_mmu1 = t_t2i1
+            else:
+                t_t2i0 = time.time()
+                intermediate_images = self._t2i_rollout(edit_prompts, batch_pil_images)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize(device=self._device)
+                t_t2i1 = time.time()
 
-            t_mmu0 = time.time()
-            text_outputs = self._mmu_rollout(und_prompts, batch_pil_images, intermediate_images, gen_kwargs)
-            if torch.cuda.is_available():
-                torch.cuda.synchronize(device=self._device)
-            t_mmu1 = time.time()
+                t_mmu0 = time.time()
+                text_outputs = self._mmu_rollout(und_prompts, batch_pil_images, intermediate_images, gen_kwargs)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize(device=self._device)
+                t_mmu1 = time.time()
 
             text_outputs = [t.lstrip("!").strip() for t in text_outputs]
 
