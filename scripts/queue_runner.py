@@ -38,12 +38,17 @@ import rescore_all                            # noqa: E402
 # ──────────────────────────── configuration ────────────────────────────
 
 CKPTS = [
-    # (label, full path or HF repo)
-    ("Unified-cp50",          "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50"),
-    ("region-edit-cp50",      "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-region-edit-LavidaO/checkpoint-50"),
-    ("answer-LavidaO-ckpt50", "yjyjyj98/thinkmorph_answer-LavidaO-ckpt50"),
-    ("edit-LavidaO-ckpt50",   "yjyjyj98/thinkmorph_edit-LavidaO-ckpt50"),
-    ("interleave-cp50",       "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-LavidaO/checkpoint-50"),
+    # (label, path or HF repo, allowed_tasks or None for "all TASKS")
+    ("Unified-cp50",          "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-Unified-LavidaO/checkpoint-50", None),
+    ("region-edit-cp50",      "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-region-edit-LavidaO/checkpoint-50", None),
+    ("answer-LavidaO-ckpt50", "yjyjyj98/thinkmorph_answer-LavidaO-ckpt50", None),
+    ("edit-LavidaO-ckpt50",   "yjyjyj98/thinkmorph_edit-LavidaO-ckpt50", None),
+    ("interleave-cp50",       "/scratch2/yoonjeon.kim/rl-lavidao-thinkmorph/thinkmorph_interleave-LavidaO/checkpoint-50", None),
+    # Newly queued at user's request: only the 4 reasoning-style tasks for these.
+    ("LaViDa-O",              "/scratch2/yoonjeon.kim/LaViDa-O",
+        ["mmstar", "mmmu_val", "cv_bench_reasoning", "vstar_bench"]),
+    ("sft-zebracot",          "/scratch2/yoonjeon.kim/sft_LaViDa-O-thinkmorph_zebracot-step9000",
+        ["mmstar", "mmmu_val", "cv_bench_reasoning", "vstar_bench"]),
 ]
 
 TASKS = [
@@ -58,10 +63,18 @@ TASKS = [
 # of 2**15 / max_new_tokens — halve the budget for that task so each text batch
 # is smaller and fits in 143 GB H200 memory.
 TASK_TEXT_BATCH_BUDGET = {
-    "mmmu_val": 2 ** 12,   # 4096 tokens of budget → text_batch_size = 4 at max_new_tokens=1024
-                           # (lowered from 2**14 / batch=16 after repeated OOMs on H200/143GB:
-                           # image-gen phase alone uses ~87 GB, leaving ~55 GB for text-gen;
-                           # batch=16 needed ~70 GB for text and OOM'd at batch 14/29)
+    "mmmu_val": 2 ** 11,   # 2048 tokens of budget → text_batch_size = 2 at max_new_tokens=1024.
+                           # batch=4 still OOM'd even with --num_processes=2 (DP doesn't reduce
+                           # per-rank memory pressure — each rank still allocates the full
+                           # text-gen activations). Manual diagnostic at batch=2 ran cleanly
+                           # with ~55 GB headroom on the H200/143GB.
+}
+
+# Per-task GPU count. Tasks with count > 1 are launched via `accelerate launch
+# --num_processes=N`, halving the per-rank dataset slice and reducing peak
+# memory pressure. Default is 1 (plain `python -m lmms_eval`).
+TASK_GPU_COUNT = {
+    "mmmu_val": 2,        # data-parallel across 2 GPUs to dodge OOMs at batch=4
 }
 
 BASE_OUT      = Path("/scratch2/yoonjeon.kim/outputs")
@@ -106,8 +119,11 @@ def cell_filtered(c: dict) -> bool:
 
 def build_cells() -> list[dict]:
     cells = []
-    for ck_label, ck_path in CKPTS:
-        for task in TASKS:
+    for entry in CKPTS:
+        ck_label, ck_path = entry[0], entry[1]
+        allowed = entry[2] if len(entry) > 2 else None
+        ck_tasks = allowed if allowed else TASKS
+        for task in ck_tasks:
             cells.append({
                 "id":               f"{ck_label}__{task}",
                 "ckpt_path":        ck_path,
@@ -115,7 +131,9 @@ def build_cells() -> list[dict]:
                 "task":             task,
                 "status":           "pending",
                 "pid":              None,
-                "gpu_id":           None,
+                "gpu_id":           None,                     # primary GPU (= gpu_ids[0]); kept for display + back-compat
+                "gpu_ids":          [],                       # all GPUs reserved for this cell (1..N)
+                "gpu_count":        TASK_GPU_COUNT.get(task, 1),
                 "started_at":       None,
                 "ended_at":         None,
                 "retries":          0,
@@ -131,6 +149,12 @@ def build_cells() -> list[dict]:
                 "error_excerpt":    None,
             })
     return cells
+
+
+def cell_gpus(cell: dict) -> list[int]:
+    """Return the cell's GPU id list, normalising legacy single-GPU records."""
+    g = cell.get("gpu_ids") or ([] if cell.get("gpu_id") is None else [cell["gpu_id"]])
+    return list(g)
 
 
 def mark_already_done(cells: list[dict]) -> int:
@@ -151,12 +175,19 @@ def mark_already_done(cells: list[dict]) -> int:
 
 
 def merge_cells(existing: list[dict], target: list[dict]) -> list[dict]:
-    """Keep state for cells already in lock; add new cells from target."""
+    """Keep STATE for cells already in lock; refresh CONFIG fields from target.
+    Add fresh cells from target. Drops cells that are no longer in target."""
     by_id = {c["id"]: c for c in existing}
+    # Config fields (path-/policy-derived) — always taken from target so a
+    # config change in queue_runner.py propagates on next restart.
+    config_keys = ("gpu_count", "ckpt_path", "jsonl_path", "max_retries")
     out = []
     for t in target:
         if t["id"] in by_id:
-            out.append(by_id[t["id"]])
+            merged = {**by_id[t["id"]]}
+            for k in config_keys:
+                merged[k] = t[k]
+            out.append(merged)
         else:
             out.append(t)
     return out
@@ -164,8 +195,12 @@ def merge_cells(existing: list[dict], target: list[dict]) -> list[dict]:
 
 # ──────────────────────────── launch / monitor ────────────────────────────
 
-def build_command(cell: dict, gpu: int) -> tuple[list[str], dict, Path]:
-    """Return (argv, env, log_path) for the lmms-eval invocation."""
+def build_command(cell: dict, gpus: list[int]) -> tuple[list[str], dict, Path]:
+    """Return (argv, env, log_path) for the lmms-eval invocation. When more
+    than one GPU is allocated, use `accelerate launch --num_processes=N` so
+    lmms-eval data-parallelises across the ranks (mirrors run_lmms-eval.sh
+    NUM_GPUS>1 branch)."""
+    assert gpus, "build_command needs at least one GPU"
     job_dir = TMP_DIR / cell["id"]
     job_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,7 +216,22 @@ def build_command(cell: dict, gpu: int) -> tuple[list[str], dict, Path]:
         f"gen_img_dir={gen_img}"
     )
 
-    argv = LMMS_EVAL_BIN + [
+    n = len(gpus)
+    if n == 1:
+        launch_cmd = LMMS_EVAL_BIN[:]
+    else:
+        # Random port to avoid collisions if multiple multi-GPU cells run concurrently.
+        master_port = 10000 + os.getpid() % 50000 + n
+        launch_cmd = [
+            "accelerate", "launch",
+            "--num_machines=1", "--machine_rank=0",
+            f"--main_process_ip=127.0.0.1",
+            f"--main_process_port={master_port}",
+            f"--num_processes={n}",
+            "-m", "lmms_eval",
+        ]
+
+    argv = launch_cmd + [
         "--model", "llava_llada",
         "--model_args", model_args,
         "--tasks", cell["task"],
@@ -192,26 +242,27 @@ def build_command(cell: dict, gpu: int) -> tuple[list[str], dict, Path]:
         "--wandb_args", f"project=lmms-eval,job_type=eval,name=queue_{cell['id']}",
     ]
 
-    # blink_jigsaw's pre_prompt is now baked into the in-tree
-    # `lmms-eval/lmms_eval/tasks/blink/_default_template_yaml`, so no overlay
-    # yaml is needed any more.
-
     env = os.environ.copy()
     # Mirror run_lmms-eval.sh's NUM_GPUS=1 branch: unset distributed env vars so
     # accelerate runs in single-process mode without torch.distributed rendezvous.
+    # For NUM_GPUS>1 accelerate sets these itself via --main_process_port etc.
     for k in ("RANK", "WORLD_SIZE", "LOCAL_RANK", "LOCAL_WORLD_SIZE",
               "NODE_RANK", "MASTER_ADDR", "MASTER_PORT"):
         env.pop(k, None)
-    # Per-task budget override wins over the global TEXT_BATCH_BUDGET so
-    # OOM-prone tasks (e.g. mmmu_val) get smaller text batches.
     budget = TASK_TEXT_BATCH_BUDGET.get(cell["task"], int(TEXT_BUDGET))
     env.update({
-        "CUDA_VISIBLE_DEVICES":   str(gpu),
+        "CUDA_VISIBLE_DEVICES":   ",".join(str(g) for g in gpus),
         "NOT_ALWASY_DO_2DPOOL":   "1",
         "DEBUG_PRINT_IMAGE_RES":  "1",
         "DEBUG_FIX_PADDING":      "1",
         "TEXT_BATCH_BUDGET":      str(budget),
         "TEXT_BATCH_SCALE":       str(cell["text_batch_scale"]),
+        # expandable_segments lets PyTorch reuse its reserved-but-unallocated
+        # cache (~21 GB at the mmmu_val OOM site) for larger allocations.
+        # The PyTorch OOM error itself recommends this for fragmentation-driven
+        # failures (the 34.6 GB allocation that crashes mmmu_val is the same
+        # size at batch=4 and batch=2, so it's not a text-batch-scaling issue).
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
     })
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -219,24 +270,27 @@ def build_command(cell: dict, gpu: int) -> tuple[list[str], dict, Path]:
     return argv, env, log_path
 
 
-def launch(cell: dict, gpu: int) -> None:
-    argv, env, log_path = build_command(cell, gpu)
-    print(f"[launch] {cell['id']} on GPU {gpu} → {log_path}")
+def launch(cell: dict, gpus: list[int]) -> None:
+    argv, env, log_path = build_command(cell, gpus)
+    gpu_str = ",".join(str(g) for g in gpus)
+    print(f"[launch] {cell['id']} on GPUs {gpu_str} → {log_path}")
     print("         " + " ".join(shlex.quote(x) for x in argv))
     fh = log_path.open("ab")
-    fh.write(f"\n=== queue_runner launch at {ql.utc_now()} | gpu={gpu} | scale={cell['text_batch_scale']} ===\n".encode())
+    fh.write(f"\n=== queue_runner launch at {ql.utc_now()} | gpus={gpu_str} | scale={cell['text_batch_scale']} ===\n".encode())
     fh.flush()
     proc = subprocess.Popen(
         argv, env=env, stdout=fh, stderr=fh,
         cwd=str(REPO), start_new_session=True,
     )
     cell["pid"]        = proc.pid
-    cell["gpu_id"]     = gpu
+    cell["gpu_ids"]    = list(gpus)
+    cell["gpu_id"]     = gpus[0]
     cell["status"]     = "running"
     cell["started_at"] = ql.utc_now()
     cell["log_path"]   = str(log_path)
+    gpu_disp = gpu_str if len(gpus) > 1 else f"GPU {gpus[0]}"
     ql.slack_post(
-        f"▶ `{cell['ckpt_label']}` · `{cell['task']}` on GPU {gpu} (pid {proc.pid}) — log `{log_path.name}`, scale={cell['text_batch_scale']}",
+        f"▶ `{cell['ckpt_label']}` · `{cell['task']}` on {gpu_disp} (pid {proc.pid}) — log `{log_path.name}`, scale={cell['text_batch_scale']}",
         mute=SLACK_MUTE,
     )
 
@@ -252,20 +306,22 @@ def update_progress(cell: dict) -> None:
 
 
 def _safe_release(cell: dict, pool: ql.GPUPool, all_cells: list[dict]) -> None:
-    """Release a GPU back to the pool only if no OTHER running cell is still
-    holding it. Prevents double-allocation when one cell's finalize races with
-    another cell's launch on the same GPU id."""
-    gpu = cell.get("gpu_id")
-    if gpu is None:
+    """Release each GPU held by this cell back to the pool, but only if no OTHER
+    running cell is still holding it. Prevents double-allocation when one cell's
+    finalize races with another cell's launch on the same GPU id."""
+    my_gpus = cell_gpus(cell)
+    if not my_gpus:
         return
-    others = [
-        c for c in all_cells
-        if c is not cell and c.get("status") == "running" and c.get("gpu_id") == gpu
-    ]
-    if others:
-        # Some other cell is using this GPU now; don't put it back in the free pool.
-        return
-    pool.release(gpu)
+    for gpu in my_gpus:
+        others = [
+            c for c in all_cells
+            if c is not cell
+            and c.get("status") == "running"
+            and gpu in cell_gpus(c)
+        ]
+        if others:
+            continue
+        pool.release(gpu)
 
 
 def finalize(cell: dict, pool: ql.GPUPool, all_cells: list[dict] | None = None) -> bool:
@@ -308,7 +364,8 @@ def finalize(cell: dict, pool: ql.GPUPool, all_cells: list[dict] | None = None) 
                 mute=SLACK_MUTE,
             )
             _safe_release(cell, pool, all_cells)
-            cell["gpu_id"] = None
+            cell["gpu_id"]  = None
+            cell["gpu_ids"] = []
             return False     # not terminal — back to pending
         cell["status"] = "error_oom"
     else:
@@ -337,7 +394,7 @@ STATUS_GLYPH = {
 
 
 def render_top_section(cells: list[dict]) -> str:
-    rows = {ck for ck, _ in CKPTS}
+    rows = {entry[0] for entry in CKPTS}
     by   = {(c["ckpt_label"], c["task"]): c for c in cells}
     n_done    = sum(1 for c in cells if c["status"] == "done")
     n_running = sum(1 for c in cells if c["status"] == "running")
@@ -358,7 +415,8 @@ def render_top_section(cells: list[dict]) -> str:
     out.append("")
     out.append("|             | " + " | ".join(f"`{t}`" for t in TASKS) + " |")
     out.append("|---|" + "|".join([":-:"] * len(TASKS)) + "|")
-    for ck_label, _ in CKPTS:
+    for entry in CKPTS:
+        ck_label = entry[0]
         if ck_label not in rows:
             continue
         cells_in_row = [by.get((ck_label, t)) for t in TASKS]
@@ -396,7 +454,7 @@ def render_top_section(cells: list[dict]) -> str:
             remain  = ql.hms(c["tqdm_remaining_s"])
             pct     = f"{c['tqdm_pct']:.0f}%" if c["tqdm_pct"] is not None else "—"
             out.append(
-                f"| `{c['ckpt_label']}` | `{c['task']}` | {c['gpu_id']} | "
+                f"| `{c['ckpt_label']}` | `{c['task']}` | {','.join(str(g) for g in cell_gpus(c)) or '—'} | "
                 f"{c['started_at'] or '—'} | {elapsed} | {pct} | {remain} |"
             )
         out.append("")
@@ -458,10 +516,11 @@ def main() -> int:
         print("[queue] no GPUs visible. Exiting.")
         return 1
     pool = ql.GPUPool(gpus)
-    # Re-attach pass 1: any cell with a still-alive PID keeps its GPU reserved.
+    # Re-attach pass 1: any cell with a still-alive PID keeps ALL its GPUs reserved.
     for c in cells:
-        if c["status"] == "running" and ql.pid_alive(c.get("pid")) and c.get("gpu_id") is not None:
-            pool.reserve(c["gpu_id"])
+        if c["status"] == "running" and ql.pid_alive(c.get("pid")):
+            for g in cell_gpus(c):
+                pool.reserve(g)
     # Re-attach pass 2: any cell whose PID is dead (orchestrator restart, manual
     # kill, OOM, crash, etc.) gets finalized BEFORE the dispatch loop. This
     # prevents a window where pool.release() in the OOM-retry path collides with
@@ -482,14 +541,24 @@ def main() -> int:
 
     try:
         while True:
-            # Dispatch (filters narrow which pending cells are picked up)
+            # Dispatch (filters narrow which pending cells are picked up).
+            # Multi-GPU cells (e.g. mmmu_val with gpu_count=2) need the full
+            # bundle acquired atomically; if the pool can't satisfy that yet,
+            # leave the cell pending and try again next tick.
             for c in cells:
                 if c["status"] != "pending" or cell_filtered(c):
                     continue
-                gpu = pool.acquire()
-                if gpu is None:
-                    break
-                launch(c, gpu)
+                need = c.get("gpu_count", 1)
+                if len(pool.free) < need:
+                    continue
+                acquired = [pool.acquire() for _ in range(need)]
+                if any(g is None for g in acquired):
+                    # shouldn't happen given the len check above, but be safe
+                    for g in acquired:
+                        if g is not None:
+                            pool.release(g)
+                    continue
+                launch(c, acquired)
                 ql.save_lock(lock)
                 write_report(cells)
 

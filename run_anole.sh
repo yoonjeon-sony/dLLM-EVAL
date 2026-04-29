@@ -18,15 +18,9 @@ set -eo pipefail
 
 # --- ckpt resolution -------------------------------------------------------
 # Logical name (used for output dir + reporting).
-CKPT_NAME=${CKPT_NAME:-GAIR/Anole-7b}
-# Filesystem path to the chameleon-native checkpoint dir. Must contain:
-#   models/7b/consolidated.pth
-#   tokenizer/{text_tokenizer.json,vqgan.yaml,vqgan.ckpt}
-# GAIR/Anole-7b's weights are the same as GAIR/Anole-7b-v0.1; the v0.1 repo
-# ships them in the chameleon-native layout that ChameleonInferenceModel
-# expects. We default to the locally-downloaded copy.
-CKPT_PATH=${CKPT_PATH:-/home/yoonjeon.kim/dLLM-EVAL/anole/ckpts/Anole-7b-v0.1}
 
+CKPT_PATH=${CKPT_PATH:-/scratch2/yoonjeon.kim/Anole-7b-v0.1}
+CKPT_NAME=$(basename "$CKPT_PATH")
 for asset in \
   "${CKPT_PATH}/models/7b/consolidated.pth" \
   "${CKPT_PATH}/tokenizer/text_tokenizer.json" \

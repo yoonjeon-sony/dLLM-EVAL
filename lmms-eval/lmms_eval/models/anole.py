@@ -252,7 +252,9 @@ class Anole(lmms):
 
             options = Options()
             options.max_seq_len = self.max_seq_len
-            options.max_gen_len = max_new_tokens
+            # Prompt forces a 1024-token image segment first via the <START-OF-IMAGE>
+            # sentinel, so the task's max_new_tokens must be in addition to it.
+            options.max_gen_len = max_new_tokens + 1024
             if self.temperature == 0:
                 options.txt.greedy = True
             else:

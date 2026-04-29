@@ -83,6 +83,7 @@ AVAILABLE_MODELS = {
     "llava_llada":"Llava_Llada",
     "llava_dream":"Llava_Dream",
     "mmada": "Mmada",
+    "mmada_m": "MmadaM",
 }
 
 

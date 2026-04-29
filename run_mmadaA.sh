@@ -10,17 +10,18 @@
 #SBATCH --output=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/output.%j.log
 #SBATCH --error=/home/yoonjeon.kim/dLLM-RL/train_sft/slurm-logs/error.%j.log
 
-# Example:
-#   CHAT_MODE=image_gen TASKS="blink_jigsaw,vstar_bench" sbatch run_mmada.sh 0
-CHAT_MODE=${CHAT_MODE:-image_gen} # text_gen,image_gen
 USE_BBOX=${USE_BBOX:-False}       # accepted for parity, ignored by Mmada
 CKPT_INDEX=$1
 shift
 
 declare -a CKPTS=(
   "tyfeld/MMaDA-Parallel-A"
-  # add MMaDA fine-tunes here, e.g.
-  # "/scratch2/yoonjeon.kim/sft_MMaDA-PM-thinkmorph_zebracot/checkpoint-8000"
+  "/scratch2/yoonjeon.kim/sft_mmadaPA-thinkmorph/epoch2"
+)
+
+declare -a BASE_INDEX=(
+  ""
+  "0"
 )
 if [[ -z "${CKPT_INDEX}" ]]; then
     echo "Error: CKPT_INDEX (first positional argument) is required. Valid range: 0-$((${#CKPTS[@]} - 1))" >&2
@@ -31,6 +32,16 @@ if ! [[ "${CKPT_INDEX}" =~ ^[0-9]+$ ]] || (( CKPT_INDEX >= ${#CKPTS[@]} )); then
     exit 1
 fi
 CKPT="${CKPTS[${CKPT_INDEX}]}"
+BASE_INDEX_VAL="${BASE_INDEX[${CKPT_INDEX}]:-}"
+if [[ -n "${BASE_INDEX_VAL}" ]]; then
+    if ! [[ "${BASE_INDEX_VAL}" =~ ^[0-9]+$ ]] || (( BASE_INDEX_VAL >= ${#CKPTS[@]} )); then
+        echo "Error: BASE_INDEX[${CKPT_INDEX}]='${BASE_INDEX_VAL}' is out of range." >&2
+        exit 1
+    fi
+    BASE_CKPT="${CKPTS[${BASE_INDEX_VAL}]}"
+else
+    BASE_CKPT="${CKPT}"
+fi
 LIMIT=${LIMIT:-}
 NUM_GPUS=${NUM_GPUS:-2}
 TASKS=${TASKS:-}
@@ -52,7 +63,7 @@ OUTPUT_SUFFIX=""
 if [[ -n "${RUN_TAG}" ]]; then
     OUTPUT_SUFFIX="_${RUN_TAG}"
 fi
-OUTPUT_DIR="${BASE_DIR}/mmada_${CHAT_MODE}_usebbox${USE_BBOX}/${MODEL_NAME}${OUTPUT_SUFFIX}"
+OUTPUT_DIR="${BASE_DIR}/mmada_usebbox${USE_BBOX}/${MODEL_NAME}${OUTPUT_SUFFIX}"
 
 if [ "${NUM_GPUS}" -eq 1 ]; then
     LAUNCH_CMD="python"
@@ -67,7 +78,7 @@ else
     LAUNCH_ARGS="-m lmms_eval"
 fi
 
-echo "Running MMaDA with TASKS=${TASKS} CKPT=${CKPT} CHAT_MODE=${CHAT_MODE}"
+echo "Running MMaDA with TASKS=${TASKS} CKPT=${CKPT} BASE_CKPT=${BASE_CKPT}"
 
 LIMIT_ARGS=()
 if [[ -n "${LIMIT}" && "${LIMIT,,}" != "none" ]]; then
@@ -84,7 +95,7 @@ fi
 
 ${LAUNCH_CMD} ${LAUNCH_ARGS} \
     --model mmada \
-    --model_args pretrained=$CKPT,gen_img_dir=${OUTPUT_DIR}/gen_imgs,chat_mode=${CHAT_MODE} \
+    --model_args pretrained=$CKPT,vae_ckpt=$BASE_CKPT,tokenizer_path=$BASE_CKPT,gen_img_dir=${OUTPUT_DIR}/gen_imgs \
     --tasks "$TASKS" \
     --gen_kwargs prefix_lm=True \
     --log_samples \
